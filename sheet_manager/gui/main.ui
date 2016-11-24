@@ -631,7 +631,16 @@
     <addaction name="actionOpen_sheet"/>
     <addaction name="actionOpen"/>
    </widget>
+   <widget class="QMenu" name="menuOMR">
+    <property name="title">
+     <string>OMR</string>
+    </property>
+    <addaction name="actionInit"/>
+    <addaction name="actionDetect_note_heads"/>
+    <addaction name="actionDetect_systems"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuOMR"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionOpen">
@@ -642,6 +651,21 @@
   <action name="actionOpen_sheet">
    <property name="text">
     <string>Open Sheet</string>
+   </property>
+  </action>
+  <action name="actionInit">
+   <property name="text">
+    <string>Init ...</string>
+   </property>
+  </action>
+  <action name="actionDetect_note_heads">
+   <property name="text">
+    <string>Detect note heads</string>
+   </property>
+  </action>
+  <action name="actionDetect_systems">
+   <property name="text">
+    <string>Detect systems</string>
    </property>
   </action>
  </widget>

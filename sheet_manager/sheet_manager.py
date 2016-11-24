@@ -40,6 +40,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.actionOpen_sheet.triggered.connect(self.open_sheet)
         self.pushButton_open.clicked.connect(self.open_sheet)
 
+        # connect to omr menu
+        self.actionInit.triggered.connect(self.init_omr)
+        self.actionDetect_note_heads.triggered.connect(self.detect_note_heads)
+        self.actionDetect_systems.triggered.connect(self.detect_systems)
+
         # connect to buttons
         self.pushButton_mxml2midi.clicked.connect(self.mxml2midi)
         self.pushButton_generateCoords.clicked.connect(self.generate_note_coords)
@@ -72,13 +77,24 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.page_coords = None
         self.page_systems = None
 
+        self.folder_name = None
+        self.piece_name = None
+
+        self.omr = None
+
     def open_sheet(self):
         """
         Open entire folder
         """
 
-        # TODO: change this
+        # piece root folder
         self.folder_name = str(QtGui.QFileDialog.getExistingDirectory(self, "Select Sheet Music", "."))
+
+        # initialize folder structure
+        for sub_dir in ["sheet", "spec", "audio", "coords"]:
+            sub_path = os.path.join(self.folder_name, sub_dir)
+            if not os.path.exists(sub_path):
+                os.mkdir(sub_path)
 
         # name of piece
         self.piece_name = os.path.basename(self.folder_name)
@@ -257,7 +273,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # load data
         n_pages = len(img_files)
         for i in xrange(n_pages):
-            self.sheet_pages.append(cv2.imread(img_files[i], 0) / 255.)
+            self.sheet_pages.append(cv2.imread(img_files[i], 0))
             
             self.page_coords.append(np.zeros((0, 2)))
             self.page_rois.append([])
@@ -316,6 +332,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
     def systems_to_rois(self):
         """ Convert systems to rois"""
         self.page_rois = []
+
+        # sort systems
+        for i in xrange(self.n_pages):
+            sorted_idx = np.argsort(self.page_systems[i][:, 0, 0])
+            self.page_systems[i] = self.page_systems[i][sorted_idx]
 
         for i in xrange(self.n_pages):
             width = self.sheet_pages[i].shape[1]
@@ -586,7 +607,81 @@ class SheetManager(QtGui.QMainWindow, form_class):
         Match audio to sheet images
         """
         pass
-    
+
+    def init_omr(self):
+        """ Initialize omr module """
+
+        self.status_label.setText("Initializing omr ...")
+
+        # select model
+        from omr.models import note_detector as note_model
+        from omr.models import system_detector as system_model
+        from lasagne_wrapper.network import SegmentationNetwork
+        from omr.omr_app import OpticalMusicRecognizer
+
+        # initialize note detection neural network
+        dump_file = "/home/matthias/experiments/omr/note_detector/params.pkl"
+        net = note_model.build_model()
+        note_net = SegmentationNetwork(net, print_architecture=False)
+        note_net.load(dump_file)
+
+        # initialize system detection neural network
+        dump_file = "/home/matthias/experiments/omr/system_detector/params.pkl"
+        net = system_model.build_model()
+        system_net = SegmentationNetwork(net, print_architecture=False)
+        system_net.load(dump_file)
+
+        # initialize omr system
+        self.omr = OpticalMusicRecognizer(note_detector=note_net, system_detector=system_net)
+
+        self.status_label.setText("done!")
+
+    def detect_note_heads(self):
+        """ Detect note heads in current image """
+        from omr.utils.data import prepare_image
+
+        self.status_label.setText("Detecting note heads ...")
+
+        if self.omr is None:
+            self.init_omr()
+
+        # prepare current image for detection
+        page_id = self.spinBox_page.value()
+        img = prepare_image(self.sheet_pages[page_id])
+
+        # detect note heads
+        self.page_coords[page_id] = self.omr.detect_notes(img)
+
+        # refresh view
+        self.sort_note_coords()
+        self.plot_sheet()
+
+        self.status_label.setText("done!")
+
+    def detect_systems(self):
+        """ Detect systems in current image """
+        from omr.utils.data import prepare_image
+
+        self.status_label.setText("Detecting systems ...")
+
+        if self.omr is None:
+            self.init_omr()
+
+        # prepare current image for detection
+        page_id = self.spinBox_page.value()
+        img = prepare_image(self.sheet_pages[page_id])
+
+        # detect note heads
+        self.page_systems[page_id] = self.omr.detect_systems(img)
+
+        # convert systems to rois
+        self.systems_to_rois()
+
+        # refresh view
+        self.plot_sheet()
+
+        self.status_label.setText("done!")
+
 if __name__ == "__main__":
     """ main """
     import sys
