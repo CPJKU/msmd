@@ -474,33 +474,13 @@
                </widget>
               </item>
               <item row="1" column="0">
-               <widget class="QRadioButton" name="radioButton_addCleff">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
-                <property name="text">
-                 <string>Add Cleff Positions</string>
-                </property>
-               </widget>
-              </item>
-              <item row="1" column="1">
-               <widget class="QRadioButton" name="radioButton_deleteCleff">
-                <property name="enabled">
-                 <bool>false</bool>
-                </property>
-                <property name="text">
-                 <string>Remove Cleff Positions</string>
-                </property>
-               </widget>
-              </item>
-              <item row="2" column="0">
                <widget class="QRadioButton" name="radioButton_addSystem">
                 <property name="text">
                  <string>Add System</string>
                 </property>
                </widget>
               </item>
-              <item row="2" column="1">
+              <item row="1" column="1">
                <widget class="QRadioButton" name="radioButton_deleteSystem">
                 <property name="text">
                  <string>Remove System</string>

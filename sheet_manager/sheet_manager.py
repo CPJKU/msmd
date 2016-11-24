@@ -11,7 +11,6 @@ import numpy as np
 import matplotlib
 matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
-from matplotlib.widgets import RectangleSelector
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 
@@ -72,7 +71,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.sheet_pages = None
         self.page_coords = None
         self.page_systems = None
-        self.page_cleff_pos = None
 
     def open_sheet(self):
         """
@@ -249,7 +247,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.sheet_pages = []
         self.page_coords = []
-        self.page_cleff_pos = []
         self.page_rois = []
         self.page_systems = []
 
@@ -263,7 +260,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.sheet_pages.append(cv2.imread(img_files[i], 0) / 255.)
             
             self.page_coords.append(np.zeros((0, 2)))
-            self.page_cleff_pos.append(np.zeros((0, 2)))
             self.page_rois.append([])
             self.page_systems.append(np.zeros((0, 4, 2)))
 
@@ -317,43 +313,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.status_label.setText("done!")
 
-    def load_cleff_coords(self):
-        """ Load note coordinates """
-        self.status_label.setText("Loading clef coords ...")
-
-        # prepare paths
-        coord_dir = os.path.join(self.folder_name, "coords")
-        coord_files = np.sort(glob.glob(coord_dir + "/cleffs_*.npy"))
-
-        # load data
-        if len(coord_files) > 0:
-            for i in xrange(self.n_pages):
-                if os.path.exists(coord_files[i]):
-                    page_cleff_pos = np.load(coord_files[i])
-                    sorted_idx = np.argsort(page_cleff_pos[:, 0])
-                    self.page_cleff_pos[i] = page_cleff_pos[sorted_idx, :]
-
-        # convert clef positions to rois
-        self.cleffs_to_rois()
-
-        self.status_label.setText("done!")
-
-    def cleffs_to_rois(self):
-        """ Convert clef positions to rois """
-        self.page_rois = []
-
-        for i in xrange(self.n_pages):
-            width = self.sheet_pages[i].shape[1]
-            self.page_rois.append([])
-            for cleff_coord in self.page_cleff_pos[i]:
-                r_min = cleff_coord[0] - self.window_top
-                r_max = cleff_coord[0] + self.window_bottom
-                topLeft = [r_min, 0]
-                topRight = [r_min, width]
-                bottomLeft = [r_max, 0]
-                bottomRight = [r_max, width]
-                self.page_rois[i].append(np.asarray([topLeft, topRight, bottomRight, bottomLeft]))
-
     def systems_to_rois(self):
         """ Convert systems to rois"""
         self.page_rois = []
@@ -399,9 +358,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
             coord_file = os.path.join(coord_dir, "notes_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_coords[i])
 
-            # coord_file = os.path.join(coord_dir, "cleffs_%02d.npy" % (i + 1))
-            # np.save(coord_file, self.page_cleff_pos[i])
-
             coord_file = os.path.join(coord_dir, "systems_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_systems[i])
 
@@ -440,11 +396,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # plot note coordinates
         if self.checkBox_showCoords.isChecked():
             plt.plot(self.page_coords[page_id][:, 1], self.page_coords[page_id][:, 0], 'co')
-
-        # # plot clef positions
-        # for i in xrange(self.page_cleff_pos[page_id].shape[0]):
-        #     # plot clef position
-        #     plt.plot(self.page_cleff_pos[page_id][i, 1], self.page_cleff_pos[page_id][i, 0], 'mo')
 
         # plot systems
         if self.checkBox_showSystems.isChecked():
@@ -592,33 +543,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
                     break
 
             self.systems_to_rois()
-
-        # remove clef position
-        if self.radioButton_deleteCleff.isChecked():
-
-            # find closest clef
-            dists = pairwise_distances(clicked, self.page_cleff_pos[page_id])
-            selection = np.argmin(dists)
-
-            # remove coordinate
-            self.page_cleff_pos[page_id] = np.delete(self.page_cleff_pos[page_id], selection, axis=0)
-            print "Removed cleff with id:", selection
-
-            self.cleffs_to_rois()
-        
-        # add clef position
-        if self.radioButton_addCleff.isChecked():
-            
-            # find closets clef
-            if self.page_cleff_pos[page_id].shape[0] > 0:
-                dists = pairwise_distances(clicked, self.page_cleff_pos[page_id])
-                selection = np.argmin(dists)
-            else:
-                selection = -1
-            
-            self.page_cleff_pos[page_id] = np.insert(self.page_cleff_pos[page_id], selection + 1, clicked, axis=0)
-
-            self.cleffs_to_rois()
         
         # remove note position
         if self.radioButton_deletNote.isChecked():
@@ -642,7 +566,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 selection = -1
             
             self.page_coords[page_id] = np.insert(self.page_coords[page_id], selection + 1, clicked, axis=0)
-
         
         # update sheet statistics
         self.update_sheet_statistics()        
