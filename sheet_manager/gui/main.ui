@@ -28,15 +28,15 @@
        <enum>QFrame::Sunken</enum>
       </property>
       <property name="currentIndex">
-       <number>3</number>
+       <number>1</number>
       </property>
       <widget class="QWidget" name="page">
        <property name="geometry">
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>558</width>
-         <height>307</height>
+         <width>243</width>
+         <height>90</height>
         </rect>
        </property>
        <attribute name="label">
@@ -128,7 +128,7 @@
          <x>0</x>
          <y>0</y>
          <width>558</width>
-         <height>307</height>
+         <height>299</height>
         </rect>
        </property>
        <attribute name="label">
@@ -149,20 +149,6 @@
           </property>
           <property name="text">
            <string>show spec</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="0">
-         <widget class="QPushButton" name="pushButton_generateCoords">
-          <property name="text">
-           <string>Generate Coordinates</string>
-          </property>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QPushButton" name="pushButton_renderAudio">
-          <property name="text">
-           <string>Render Audios</string>
           </property>
          </widget>
         </item>
@@ -192,13 +178,6 @@
           </property>
          </widget>
         </item>
-        <item row="2" column="1">
-         <widget class="QPushButton" name="pushButton_pdf2Img">
-          <property name="text">
-           <string>PDF to Image</string>
-          </property>
-         </widget>
-        </item>
         <item row="2" column="0">
          <widget class="QCheckBox" name="checkBox_showSheet">
           <property name="layoutDirection">
@@ -209,6 +188,20 @@
           </property>
          </widget>
         </item>
+        <item row="0" column="0">
+         <widget class="QPushButton" name="pushButton_pdf2Img">
+          <property name="text">
+           <string>PDF to Image</string>
+          </property>
+         </widget>
+        </item>
+        <item row="0" column="1">
+         <widget class="QPushButton" name="pushButton_renderAudio">
+          <property name="text">
+           <string>Render Audios</string>
+          </property>
+         </widget>
+        </item>
        </layout>
       </widget>
       <widget class="QWidget" name="page_3">
@@ -216,8 +209,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>558</width>
-         <height>307</height>
+         <width>316</width>
+         <height>184</height>
         </rect>
        </property>
        <attribute name="label">
@@ -332,8 +325,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>558</width>
-         <height>307</height>
+         <width>520</width>
+         <height>244</height>
         </rect>
        </property>
        <attribute name="label">
@@ -581,8 +574,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>558</width>
-         <height>307</height>
+         <width>195</width>
+         <height>52</height>
         </rect>
        </property>
        <attribute name="label">
@@ -621,7 +614,7 @@
      <x>0</x>
      <y>0</y>
      <width>576</width>
-     <height>25</height>
+     <height>26</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">

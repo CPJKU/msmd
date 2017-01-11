@@ -16,7 +16,10 @@ from matplotlib.collections import PatchCollection
 
 form_class = uic.loadUiType("gui/main.ui")[0]
 
-from utils import sort_by_roi
+from utils import sort_by_roi, natsort
+
+
+BPMs = [120]
 
 
 class SheetManager(QtGui.QMainWindow, form_class):
@@ -47,7 +50,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # connect to buttons
         self.pushButton_mxml2midi.clicked.connect(self.mxml2midi)
-        self.pushButton_generateCoords.clicked.connect(self.generate_note_coords)
         self.pushButton_renderAudio.clicked.connect(self.render_audio)
         self.pushButton_parseMidi.clicked.connect(self.parse_midi)
         self.pushButton_editCoords.clicked.connect(self.edit_coords)
@@ -133,7 +135,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         target_width = 835
 
         file_paths = glob.glob("tmp/*.png")
-        file_paths = np.sort(file_paths)
+        file_paths = natsort(file_paths)
         for i, img_path in enumerate(file_paths):
             img = cv2.imread(img_path, -1)
 
@@ -164,56 +166,14 @@ class SheetManager(QtGui.QMainWindow, form_class):
         os.system("cp tmp/tmp.midi %s" % self.midi_file)
         self.lineEdit_midi.setText(self.midi_file)
 
-    def generate_note_coords(self):
-        """
-        Render sheet music and generate note coordinates in sheet
-        """
-        from score_alignment.lilypond_note_coords.MXMLAnnotator import MXMLAnnotator
-
-        # run annotator
-        annotator = MXMLAnnotator()
-        data = annotator.process(self.mxml_file, self.lily_file)
-
-        # save data
-        sheet_directory = os.path.join(self.folder_name, 'sheet')
-        for i, [I, staff_pos, coords] in enumerate(data):
-
-            # save images
-            img_file = os.path.join(sheet_directory, "page_%02d.png" % (i + 1))
-            cv2.imwrite(img_file, I)
-
-            # save coordinates
-            coord_file = os.path.join(sheet_directory, "coords_%02d.npy" % (i + 1))
-            np.save(coord_file, [staff_pos, coords])
-
-        # show sheet along with coordinates
-        if self.checkBox_showSheet.isChecked():
-
-            for [I, staff_pos, coords] in data:
-                plt.figure()
-                plt.clf()
-
-                plt.imshow(I, cmap=plt.cm.gray)
-
-                plt.plot(coords[:, 1], coords[:, 0], 'bo')
-
-                plt.xlim([0, I.shape[1] - 1])
-                plt.ylim([I.shape[0] - 1, 0])
-
-                plt.xlabel(I.shape[1])
-                plt.ylabel(I.shape[0])
-
-                plt.plot(staff_pos[:, 1], staff_pos[:, 0], 'mo')
-
-                plt.show(block=True)
-
     def render_audio(self):
         """
         Render audio from midi
         """
         self.status_label.setText("Rendering audio ...")
         from score_alignment.lilypond_note_coords.render_audio import render_audio
-        render_audio(self.midi_file, sound_font="Steinway", bpm=None, velocity=None)
+        for bpm in BPMs:
+            render_audio(self.midi_file, sound_font="Steinway", bpm=bpm, velocity=None)
         self.status_label.setText("done!")
 
     def parse_midi(self):

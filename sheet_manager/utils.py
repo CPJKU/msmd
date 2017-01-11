@@ -46,3 +46,12 @@ def sort_by_roi(coords, systems):
         row_sorted_coords = np.vstack((row_sorted_coords, rc))
 
     return row_sorted_coords
+
+
+def natsort(l):
+    """ natural sorting of file name strings """
+    l = np.asarray(l)
+    print l
+    sorted_idx = np.argsort([int(s.split("-")[1].split(".")[0]) for s in l])
+    print sorted_idx
+    return l[sorted_idx]
