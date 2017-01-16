@@ -47,6 +47,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.actionInit.triggered.connect(self.init_omr)
         self.actionDetect_note_heads.triggered.connect(self.detect_note_heads)
         self.actionDetect_systems.triggered.connect(self.detect_systems)
+        self.actionDetect_bars.triggered.connect(self.detect_bars)
+
+        # connect to check boxes
+        self.checkBox_showCoords.stateChanged.connect(self.plot_sheet)
+        self.checkBox_showRois.stateChanged.connect(self.plot_sheet)
+        self.checkBox_showSystems.stateChanged.connect(self.plot_sheet)
+        self.checkBox_showBars.stateChanged.connect(self.plot_sheet)
 
         # connect to buttons
         self.pushButton_mxml2midi.clicked.connect(self.mxml2midi)
@@ -78,6 +85,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.sheet_pages = None
         self.page_coords = None
         self.page_systems = None
+        self.page_bars = None
 
         self.folder_name = None
         self.piece_name = None
@@ -225,6 +233,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.page_coords = []
         self.page_rois = []
         self.page_systems = []
+        self.page_bars = []
 
         # prepare paths
         sheet_dir = os.path.join(self.folder_name, "sheet")
@@ -238,6 +247,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.page_coords.append(np.zeros((0, 2)))
             self.page_rois.append([])
             self.page_systems.append(np.zeros((0, 4, 2)))
+            self.page_bars.append(np.zeros((0, 2, 2)))
 
         self.spinBox_page.setMaximum(n_pages - 1)
         
@@ -248,7 +258,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
     def load_coords(self):
         """ Load coordinates """
         self.load_system_coords()
+        self.load_bar_coords()
         self.load_note_coords()
+
+        self.update_sheet_statistics()
 
     def load_system_coords(self):
         """ Load system coordinates """
@@ -269,6 +282,24 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.status_label.setText("done!")
 
+    def load_bar_coords(self):
+        """ Load bar coordinates """
+        self.status_label.setText("Loading system coords ...")
+
+        # prepare paths
+        coord_dir = os.path.join(self.folder_name, "coords")
+        coord_files = np.sort(glob.glob(coord_dir + "/bars_*.npy"))
+
+        # load data
+        if len(coord_files) > 0:
+            for i in xrange(self.n_pages):
+                if os.path.exists(coord_files[i]):
+                    self.page_bars[i] = np.load(coord_files[i])
+
+        self.sort_bar_coords()
+
+        self.status_label.setText("done!")
+
     def load_note_coords(self):
         """ Load note coordinates """
         self.status_label.setText("Loading coords ...")
@@ -284,7 +315,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
                     page_coords = np.load(coord_files[i])
                     self.page_coords[i] = page_coords
 
-        self.update_sheet_statistics()
         self.sort_note_coords()
 
         self.status_label.setText("done!")
@@ -320,17 +350,52 @@ class SheetManager(QtGui.QMainWindow, form_class):
             page_coords = sort_by_roi(page_coords, page_rois)
 
             self.page_coords[page_id] = page_coords
-        
+
+    def sort_bar_coords(self):
+        """ Sort bar coords by rows """
+        from sklearn.metrics.pairwise import pairwise_distances
+
+        for page_id in xrange(self.n_pages):
+            page_bars = self.page_bars[page_id]
+            page_systems = self.page_systems[page_id]
+
+            # check if bars and systems are present
+            if page_bars.shape[0] == 0 or page_systems.shape[0] == 0:
+                break
+
+            # compute y-coordinates
+            page_systems_centers = page_systems.mean(1)[:, 0:1]
+            page_bar_centers = page_bars.mean(1)[:, 0:1]
+
+            # compute pairwise distances
+            dists = pairwise_distances(page_bar_centers, page_systems_centers)
+
+            # assign bars to systems
+            bars_by_system = [np.zeros((0, 2, 2))] * page_systems.shape[0]
+            for i in xrange(dists.shape[0]):
+                min_idx = np.argmin(dists[i])
+                bars = page_bars[i][np.newaxis, :, :]
+                bars_by_system[min_idx] = np.vstack((bars_by_system[min_idx], bars))
+
+            # sort bars within system
+            for i, system_bars in enumerate(bars_by_system):
+                sorted_idx = np.argsort(system_bars[:, 0, 1])
+                bars_by_system[i] = system_bars[sorted_idx]
+
+            self.page_bars[page_id] = np.vstack(bars_by_system)
+
     def update_sheet_statistics(self):
         """ Compute sheet statistics """
 
         self.n_pages = len(self.sheet_pages)
         self.n_systems = np.sum([len(s) for s in self.page_systems])
         self.n_coords = np.sum([len(c) for c in self.page_coords])
+        self.n_bars = np.sum([len(s) for s in self.page_bars])
 
         self.lineEdit_nPages.setText(str(self.n_pages))
         self.lineEdit_nSystems.setText(str(self.n_systems))
         self.lineEdit_nCoords.setText(str(self.n_coords))
+        self.lineEdit_nBars.setText(str(self.n_bars))
     
     def save_coords(self):
         """ Save changed sheet coords """
@@ -338,6 +403,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         for i in xrange(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "notes_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_coords[i])
+
+            coord_file = os.path.join(coord_dir, "bars_%02d.npy" % (i + 1))
+            np.save(coord_file, self.page_bars[i])
 
             coord_file = os.path.join(coord_dir, "systems_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_systems[i])
@@ -397,6 +465,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
             p = PatchCollection(patches, color='k', alpha=0.2)
             ax.add_collection(p)
+
+        # plot bars
+        if self.checkBox_showBars.isChecked():
+            for i, bar in enumerate(self.page_bars[page_id]):
+                plt.plot(bar[:, 1], bar[:, 0], 'b-', linewidth=2, alpha=0.6)
+                plt.text(bar[0, 1], bar[0, 0], i, color='b', ha='center', va='bottom',
+                         bbox=dict(facecolor='w', edgecolor='b', boxstyle='round,pad=0.2'))
 
         plt.draw()
         plt.pause(0.1)
@@ -496,7 +571,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             system_coords[2] = np.asarray([clicked[0, 0], clicked[0, 1]])
             system_coords[3] = np.asarray([clicked[0, 0], self.click_0[1]])
 
-            # find closets system
+            # find closest system
             if self.page_systems[page_id].shape[0] > 0:
                 dists = pairwise_distances(system_coords[0:1, :], self.page_systems[page_id][:, 0, :])
                 selection = np.argmin(dists)
@@ -524,9 +599,60 @@ class SheetManager(QtGui.QMainWindow, form_class):
                     break
 
             self.systems_to_rois()
-        
+
+        # add bar position
+        if self.radioButton_addBar.isChecked():
+
+            # get closest system
+            page_systems = self.page_systems[page_id]
+
+            # compute y-coordinates
+            page_systems_centers = page_systems.mean(1)[:, 0:1]
+
+            # compute pairwise distances
+            dists = pairwise_distances(clicked[:, 0:1], page_systems_centers)
+
+            # find closest system
+            min_idx = np.argmin(dists[0])
+            r0 = page_systems[min_idx, 0, 0]
+            r1 = page_systems[min_idx, 3, 0]
+
+            # compile system coordinates
+            bar_coords = np.zeros((2, 2))
+            bar_coords[0] = np.asarray([r0, clicked[0, 1]])
+            bar_coords[1] = np.asarray([r1, clicked[0, 1]])
+
+            # find closest system
+            selection = -1
+
+            self.page_bars[page_id] = np.insert(self.page_bars[page_id], selection + 1, bar_coords, axis=0)
+            self.click_0 = None
+
+        # remove bar position
+        if self.radioButton_deleteBar.isChecked():
+
+            # find closets note
+            dists = pairwise_distances(clicked, self.page_bars[page_id].mean(1))
+            selection = np.argmin(dists)
+
+            # remove coordinate
+            self.page_bars[page_id] = np.delete(self.page_bars[page_id], selection, axis=0)
+            print "Removed bar with id:", selection
+
+        # add note position
+        if self.radioButton_addNote.isChecked():
+
+            # find closets note
+            if self.page_coords[page_id].shape[0] > 0:
+                dists = pairwise_distances(clicked, self.page_coords[page_id])
+                selection = np.argmin(dists)
+            else:
+                selection = -1
+
+            self.page_coords[page_id] = np.insert(self.page_coords[page_id], selection + 1, clicked, axis=0)
+
         # remove note position
-        if self.radioButton_deletNote.isChecked():
+        if self.radioButton_deleteNote.isChecked():
             
             # find closets note
             dists = pairwise_distances(clicked, self.page_coords[page_id])
@@ -536,23 +662,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.page_coords[page_id] = np.delete(self.page_coords[page_id], selection, axis=0)
             print "Removed note with id:", selection
         
-        # add note position
-        if self.radioButton_addNote.isChecked():
-            
-            # find closets note
-            if self.page_coords[page_id].shape[0] > 0:
-                dists = pairwise_distances(clicked, self.page_coords[page_id])
-                selection = np.argmin(dists)
-            else:
-                selection = -1
-            
-            self.page_coords[page_id] = np.insert(self.page_coords[page_id], selection + 1, clicked, axis=0)
-        
         # update sheet statistics
         self.update_sheet_statistics()        
         
         # refresh view
         self.sort_note_coords()
+        self.sort_bar_coords()
         self.plot_sheet()
 
     def update_staff_windows(self):
@@ -575,6 +690,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # select model
         from omr.models import note_detector as note_model
+        from omr.models import bar_detector as bar_model
         from omr.models import system_detector as system_model
         from lasagne_wrapper.network import SegmentationNetwork
         from omr.omr_app import OpticalMusicRecognizer
@@ -585,6 +701,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
         note_net = SegmentationNetwork(net, print_architecture=False)
         note_net.load(dump_file)
 
+        # initialize bar detection neural network
+        dump_file = "/home/matthias/experiments/omr/bar_detector/params.pkl"
+        net = bar_model.build_model()
+        bar_net = SegmentationNetwork(net, print_architecture=False)
+        bar_net.load(dump_file)
+
         # initialize system detection neural network
         dump_file = "/home/matthias/experiments/omr/system_detector/params.pkl"
         net = system_model.build_model()
@@ -592,7 +714,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         system_net.load(dump_file)
 
         # initialize omr system
-        self.omr = OpticalMusicRecognizer(note_detector=note_net, system_detector=system_net)
+        self.omr = OpticalMusicRecognizer(note_detector=note_net, system_detector=system_net, bar_detector=bar_net)
 
         self.status_label.setText("done!")
 
@@ -614,6 +736,30 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # refresh view
         self.sort_note_coords()
+        self.plot_sheet()
+
+        self.status_label.setText("done!")
+
+    def detect_bars(self):
+        """ Detect bars in current image """
+        from omr.utils.data import prepare_image
+
+        self.status_label.setText("Detecting bars ...")
+
+        if self.omr is None:
+            self.init_omr()
+
+        # prepare current image for detection
+        page_id = self.spinBox_page.value()
+        img = prepare_image(self.sheet_pages[page_id])
+
+        # detect note heads
+        self.page_bars[page_id] = self.omr.detect_bars(img, systems=self.page_systems[page_id])
+
+        # sort detected bars
+        self.sort_bar_coords()
+
+        # refresh view
         self.plot_sheet()
 
         self.status_label.setText("done!")

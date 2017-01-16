@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>576</width>
+    <width>548</width>
     <height>560</height>
    </rect>
   </property>
@@ -35,8 +35,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>243</width>
-         <height>90</height>
+         <width>530</width>
+         <height>307</height>
         </rect>
        </property>
        <attribute name="label">
@@ -127,8 +127,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>558</width>
-         <height>299</height>
+         <width>530</width>
+         <height>307</height>
         </rect>
        </property>
        <attribute name="label">
@@ -209,8 +209,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>316</width>
-         <height>184</height>
+         <width>530</width>
+         <height>307</height>
         </rect>
        </property>
        <attribute name="label">
@@ -315,6 +315,16 @@
              </property>
             </widget>
            </item>
+           <item row="2" column="1">
+            <widget class="QCheckBox" name="checkBox_showBars">
+             <property name="text">
+              <string>Show Bars</string>
+             </property>
+             <property name="checked">
+              <bool>true</bool>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
@@ -325,15 +335,15 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>520</width>
-         <height>244</height>
+         <width>530</width>
+         <height>307</height>
         </rect>
        </property>
        <attribute name="label">
         <string>Edit Sheet Elements</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_5">
-        <item row="6" column="0">
+        <item row="10" column="0">
          <spacer name="verticalSpacer_4">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
@@ -365,57 +375,71 @@
            <property name="margin">
             <number>0</number>
            </property>
-           <item row="0" column="3">
+           <item row="1" column="3">
             <widget class="QLineEdit" name="lineEdit_nSystems">
              <property name="enabled">
               <bool>false</bool>
              </property>
             </widget>
            </item>
-           <item row="0" column="5">
+           <item row="1" column="8">
             <widget class="QLineEdit" name="lineEdit_nCoords">
              <property name="enabled">
               <bool>false</bool>
              </property>
             </widget>
            </item>
-           <item row="0" column="4">
+           <item row="1" column="7">
             <widget class="QLabel" name="label_8">
              <property name="text">
               <string>Coords</string>
              </property>
             </widget>
            </item>
-           <item row="0" column="0">
+           <item row="1" column="0">
             <widget class="QLabel" name="label_10">
              <property name="text">
               <string>Pages</string>
              </property>
             </widget>
            </item>
-           <item row="0" column="6">
-            <widget class="QLabel" name="label_11">
-             <property name="text">
-              <string>Onsets</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
+           <item row="1" column="1">
             <widget class="QLineEdit" name="lineEdit_nPages">
              <property name="enabled">
               <bool>false</bool>
              </property>
             </widget>
            </item>
-           <item row="0" column="2">
+           <item row="1" column="2">
             <widget class="QLabel" name="label_9">
              <property name="text">
               <string>Systems</string>
              </property>
             </widget>
            </item>
-           <item row="0" column="7">
+           <item row="1" column="5">
+            <widget class="QLabel" name="label">
+             <property name="text">
+              <string>Bars</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="0">
+            <widget class="QLabel" name="label_11">
+             <property name="text">
+              <string>Onsets</string>
+             </property>
+            </widget>
+           </item>
+           <item row="2" column="1">
             <widget class="QLineEdit" name="lineEdit_nOnsets">
+             <property name="enabled">
+              <bool>false</bool>
+             </property>
+            </widget>
+           </item>
+           <item row="1" column="6">
+            <widget class="QLineEdit" name="lineEdit_nBars">
              <property name="enabled">
               <bool>false</bool>
              </property>
@@ -460,23 +484,37 @@
                </widget>
               </item>
               <item row="0" column="1">
-               <widget class="QRadioButton" name="radioButton_deletNote">
+               <widget class="QRadioButton" name="radioButton_deleteNote">
                 <property name="text">
                  <string>Remove Note Coords</string>
                 </property>
                </widget>
               </item>
-              <item row="1" column="0">
+              <item row="2" column="0">
                <widget class="QRadioButton" name="radioButton_addSystem">
                 <property name="text">
                  <string>Add System</string>
                 </property>
                </widget>
               </item>
-              <item row="1" column="1">
+              <item row="2" column="1">
                <widget class="QRadioButton" name="radioButton_deleteSystem">
                 <property name="text">
                  <string>Remove System</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="0">
+               <widget class="QRadioButton" name="radioButton_addBar">
+                <property name="text">
+                 <string>Add Bar</string>
+                </property>
+               </widget>
+              </item>
+              <item row="1" column="1">
+               <widget class="QRadioButton" name="radioButton_deleteBar">
+                <property name="text">
+                 <string>Remove Bar</string>
                 </property>
                </widget>
               </item>
@@ -574,8 +612,8 @@
         <rect>
          <x>0</x>
          <y>0</y>
-         <width>195</width>
-         <height>52</height>
+         <width>530</width>
+         <height>307</height>
         </rect>
        </property>
        <attribute name="label">
@@ -613,8 +651,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>576</width>
-     <height>26</height>
+     <width>548</width>
+     <height>25</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -629,8 +667,9 @@
      <string>OMR</string>
     </property>
     <addaction name="actionInit"/>
-    <addaction name="actionDetect_note_heads"/>
     <addaction name="actionDetect_systems"/>
+    <addaction name="actionDetect_bars"/>
+    <addaction name="actionDetect_note_heads"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuOMR"/>
@@ -659,6 +698,11 @@
   <action name="actionDetect_systems">
    <property name="text">
     <string>Detect systems</string>
+   </property>
+  </action>
+  <action name="actionDetect_bars">
+   <property name="text">
+    <string>Detect bars</string>
    </property>
   </action>
  </widget>
