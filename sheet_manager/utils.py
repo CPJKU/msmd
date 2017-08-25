@@ -24,17 +24,17 @@ def sort_by_rows(coords, start_pos, window=40, window_top=None, window_bottom=No
     return start_pos, row_sorted_coords
 
 
-def sort_by_roi(coords, systems):
+def sort_by_roi(coords, rois):
     """
     group annotations by system
     """
 
     row_sorted_coords = np.zeros((0, 2), dtype=np.float32)
 
-    for system in systems:
+    for roi in rois:
 
         # initialize bounding box
-        bbPath = mplPath.Path(system)
+        bbPath = mplPath.Path(roi)
 
         # get notes inside bounding box
         idxs = bbPath.contains_points(coords)
@@ -52,6 +52,9 @@ def natsort(l):
     """ natural sorting of file name strings """
     l = np.asarray(l)
     print l
-    sorted_idx = np.argsort([int(s.split("-")[1].split(".")[0]) for s in l])
-    print sorted_idx
-    return l[sorted_idx]
+    if len(l) > 1:
+        sorted_idx = np.argsort([int(s.split("-")[1].split(".")[0]) for s in l])
+        print sorted_idx
+        return l[sorted_idx]
+    else:
+        return l

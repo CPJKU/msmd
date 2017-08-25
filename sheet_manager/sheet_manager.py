@@ -17,9 +17,15 @@ from matplotlib.collections import PatchCollection
 form_class = uic.loadUiType("gui/main.ui")[0]
 
 from utils import sort_by_roi, natsort
+from colormaps import cmaps
 
+from midi_parser import MidiParser
+from multi_modality_hashing.utils.real_music_data import ROOT_DIR, tr_pieces
+PIECES = tr_pieces
 
-BPMs = [120]
+BPMs = [120]  # [100, 110, 120, 130]
+sound_fonts = ["Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM"]
+# ["Steinway", "Acoustic_Piano", "Bright_Yamaha_Grand", "Unison", "Equinox_Grand_Pianos", "FluidR3_GM", "Premium_Grand_C7_24"]
 
 
 class SheetManager(QtGui.QMainWindow, form_class):
@@ -57,8 +63,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # connect to buttons
         self.pushButton_mxml2midi.clicked.connect(self.mxml2midi)
+        self.pushButton_loadSpectrogram.clicked.connect(self.load_spectrogram)
         self.pushButton_renderAudio.clicked.connect(self.render_audio)
+        self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
         self.pushButton_parseMidi.clicked.connect(self.parse_midi)
+        self.pushButton_parseAllMidis.clicked.connect(self.parse_all_midis)
         self.pushButton_editCoords.clicked.connect(self.edit_coords)
         self.pushButton_loadSheet.clicked.connect(self.load_sheet)
         self.pushButton_loadCoords.clicked.connect(self.load_coords)
@@ -87,10 +96,18 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.page_systems = None
         self.page_bars = None
 
+        self.sheet_version = None
+        self.sheet_folder = None
+        self.coord_folder = None
+
         self.folder_name = None
         self.piece_name = None
 
         self.omr = None
+
+        self.axis_label_fs = 16
+
+        self.midi_matrix = None
 
     def open_sheet(self):
         """
@@ -100,19 +117,30 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # piece root folder
         self.folder_name = str(QtGui.QFileDialog.getExistingDirectory(self, "Select Sheet Music", "."))
 
+        # name of piece
+        self.piece_name = os.path.basename(self.folder_name)
+
+        # selected sheet version
+        self.sheet_version = self.spinBox_sheetVersion.value()
+        self.sheet_version = "_%02d" % self.sheet_version if self.sheet_version > 0 else ""
+
         # initialize folder structure
-        for sub_dir in ["sheet", "spec", "audio", "coords"]:
+        self.sheet_folder = "sheet" + self.sheet_version
+        self.coord_folder = "coords" + self.sheet_version
+        for sub_dir in [self.sheet_folder, "spec", "audio", self.coord_folder]:
             sub_path = os.path.join(self.folder_name, sub_dir)
             if not os.path.exists(sub_path):
                 os.mkdir(sub_path)
 
-        # name of piece
-        self.piece_name = os.path.basename(self.folder_name)
-
         # compile file paths
         self.mxml_file = os.path.join(self.folder_name, self.piece_name + '.xml')
         self.lily_file = os.path.join(self.folder_name, self.piece_name + '.ly')
-        self.midi_file = os.path.join(self.folder_name, self.piece_name + '.midi')
+        self.midi_file = glob.glob(os.path.join(self.folder_name, self.piece_name) + '.mid*')
+
+        if len(self.midi_file) == 0:
+            self.midi_file = ""
+        else:
+            self.midi_file = self.midi_file[0]
 
         # check if files exist
         if not os.path.exists(self.mxml_file):
@@ -120,9 +148,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         if not os.path.exists(self.lily_file):
             self.lily_file = ""
-
-        if not os.path.exists(self.midi_file):
-            self.midi_file = ""
 
         # set gui elements
         self.lineEdit_mxml.setText(self.mxml_file)
@@ -134,12 +159,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.status_label.setText("Convert pdf to images ...")
         os.system("rm tmp/*.png")
-        pdf_path = os.path.join(self.folder_name, self.piece_name + '.pdf')
+        pdf_path = os.path.join(self.folder_name, self.piece_name + self.sheet_version + '.pdf')
         cmd = "convert -density 150 %s -quality 90 tmp/page.png" % pdf_path
         os.system(cmd)
 
         self.status_label.setText("Resizing images ...")
-        img_dir = os.path.join(self.folder_name, "sheet")
+        img_dir = os.path.join(self.folder_name, self.sheet_folder)
         target_width = 835
 
         file_paths = glob.glob("tmp/*.png")
@@ -150,6 +175,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             # compute resize stats
             ratio = float(target_width) / img.shape[1]
             target_height = img.shape[0] * ratio
+
             target_width = int(target_width)
             target_height = int(target_height)
 
@@ -184,25 +210,55 @@ class SheetManager(QtGui.QMainWindow, form_class):
             render_audio(self.midi_file, sound_font="Steinway", bpm=bpm, velocity=None)
         self.status_label.setText("done!")
 
+    def render_all_audios(self):
+        """
+        Render audio from midi
+        """
+        self.status_label.setText("Rendering audios ...")
+        from score_alignment.lilypond_note_coords.render_audio import render_audio
+
+        for i, piece in enumerate(PIECES):
+            txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
+            print(txt)
+
+            # clean up folder
+            for f in glob.glob(os.path.join(ROOT_DIR, piece, "audio/*")):
+                os.remove(f)
+
+            # get midi file name
+            midi_file = glob.glob(os.path.join(ROOT_DIR, piece, piece + '.mid*'))
+            if len(midi_file) == 0:
+                continue
+            midi_file = midi_file[0]
+
+            # render audios
+            for bpm in BPMs:
+                for sf in sound_fonts:
+                    render_audio(midi_file, sound_font=sf, bpm=bpm, velocity=None)
+
+        self.status_label.setText("done!")
+        print "done!"
+
     def parse_midi(self):
         """
         Parse midi file
         """
-        from score_alignment.lilypond_note_coords.MidiParser import MidiParser
-        
+        from midi_parser import MidiParser
+
         self.status_label.setText("Parsing midi ...")
         
-        pattern = self.folder_name + "/audio/*.midi"
+        pattern = self.folder_name + "/audio/*.mid*"
         for midi_file_path in glob.glob(pattern):
             print "Processing", midi_file_path
 
             # get file names and directories
             directory = os.path.dirname(midi_file_path)
-            file_name = os.path.basename(midi_file_path).split('.midi')[0]
+            file_name = os.path.basename(midi_file_path).split('.')[0]
             audio_file_path = os.path.join(directory, file_name + '.flac')
             spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
             onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
-            
+            midi_matrix_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_midi.npy')
+
             # check if to compute spectrogram
             if not self.checkBox_computeSpec.isChecked():
                 audio_file_path = None
@@ -210,18 +266,80 @@ class SheetManager(QtGui.QMainWindow, form_class):
             
             # parse midi file
             midi_parser = MidiParser(show=self.checkBox_showSpec.isChecked())
-            Spec, self.onsets = midi_parser.process(midi_file_path, audio_file_path)
+            Spec, self.onsets, self.midi_matrix = midi_parser.process(midi_file_path, audio_file_path,
+                                                                      return_midi_matrix=True)
 
             # save data
             if self.checkBox_computeSpec.isChecked():
                 self.spec = Spec
                 np.save(spec_file_path, self.spec)
+                np.save(midi_matrix_file_path, self.midi_matrix)
+
             np.save(onset_file_path, self.onsets)
         
         # set number of onsets in gui
         self.lineEdit_nOnsets.setText(str(len(self.onsets)))
         
         self.status_label.setText("done!")
+
+    def load_spectrogram(self):
+        """
+        Load spectrogram and onsets
+        """
+
+        # set file paths
+        pattern = self.folder_name + "/audio/*.mid*"
+        midi_file_path = glob.glob(pattern)[0]
+        directory = os.path.dirname(midi_file_path)
+        file_name = os.path.basename(midi_file_path).split('.')[0]
+        spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
+        onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
+
+        self.spec = np.load(spec_file_path)
+        self.onsets = np.load(onset_file_path)
+
+        # set number of onsets in gui
+        self.lineEdit_nOnsets.setText(str(len(self.onsets)))
+
+    def parse_all_midis(self):
+        """
+        Parse midi file
+        """
+
+        self.status_label.setText("Parsing midis ...")
+
+        for i, piece in enumerate(PIECES):
+            txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
+            print(txt)
+
+            # clean up folder
+            for f in glob.glob(os.path.join(ROOT_DIR, piece, "spec/*")):
+                os.remove(f)
+
+            pattern = os.path.join(ROOT_DIR, piece) + "/audio/*.mid*"
+            for midi_file_path in glob.glob(pattern):
+                print "Processing", midi_file_path
+
+                # get file names and directories
+                directory = os.path.dirname(midi_file_path)
+                file_name = os.path.basename(midi_file_path).split('.')[0]
+                audio_file_path = os.path.join(directory, file_name + '.flac')
+                spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
+                onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
+                midi_matrix_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_midi.npy')
+
+                # parse midi file
+                midi_parser = MidiParser(show=False)
+                Spec, onsets, midi_matrix = midi_parser.process(midi_file_path, audio_file_path,
+                                                                return_midi_matrix=True)
+
+                # save data
+                np.save(spec_file_path, Spec)
+                np.save(onset_file_path, onsets)
+                np.save(midi_matrix_file_path, midi_matrix)
+
+        self.status_label.setText("done!")
+        print("done!")
 
     def load_sheet(self):
         """
@@ -236,7 +354,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.page_bars = []
 
         # prepare paths
-        sheet_dir = os.path.join(self.folder_name, "sheet")
+        sheet_dir = os.path.join(self.folder_name, self.sheet_folder)
         img_files = np.sort(glob.glob(sheet_dir + "/*.*"))
 
         # load data
@@ -268,7 +386,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("Loading system coords ...")
 
         # prepare paths
-        coord_dir = os.path.join(self.folder_name, "coords")
+        coord_dir = os.path.join(self.folder_name, self.coord_folder)
         coord_files = np.sort(glob.glob(coord_dir + "/systems_*.npy"))
 
         # load data
@@ -287,7 +405,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("Loading system coords ...")
 
         # prepare paths
-        coord_dir = os.path.join(self.folder_name, "coords")
+        coord_dir = os.path.join(self.folder_name, self.coord_folder)
         coord_files = np.sort(glob.glob(coord_dir + "/bars_*.npy"))
 
         # load data
@@ -305,7 +423,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("Loading coords ...")
 
         # prepare paths
-        coord_dir = os.path.join(self.folder_name, "coords")
+        coord_dir = os.path.join(self.folder_name, self.coord_folder)
         coord_files = np.sort(glob.glob(coord_dir + "/notes_*.npy"))
 
         # load data
@@ -399,7 +517,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
     
     def save_coords(self):
         """ Save changed sheet coords """
-        coord_dir = os.path.join(self.folder_name, 'coords')
+        coord_dir = os.path.join(self.folder_name, self.coord_folder)
         for i in xrange(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "notes_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_coords[i])
@@ -439,8 +557,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         plt.imshow(self.sheet_pages[page_id], cmap=plt.cm.gray, interpolation='nearest')
         plt.xlim([0, self.sheet_pages[page_id].shape[1] - 1])
         plt.ylim([self.sheet_pages[page_id].shape[0] - 1, 0])
-        plt.xlabel(self.sheet_pages[page_id].shape[1])
-        plt.ylabel(self.sheet_pages[page_id].shape[0])
+        plt.xlabel("%d Pixel" % self.sheet_pages[page_id].shape[1], fontsize=self.axis_label_fs)
+        plt.ylabel("%d Pixel" % self.sheet_pages[page_id].shape[0], fontsize=self.axis_label_fs)
 
         # plot note coordinates
         if self.checkBox_showCoords.isChecked():
@@ -536,7 +654,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
             
             plt.figure("Spectrogram")
             plt.clf()
-            plt.imshow(self.spec, aspect='auto', origin='lower')
+
+            # plot spectrogram
+            plt.subplot(2, 1, 1)
+            plt.imshow(self.spec, aspect='auto', origin='lower', cmap=cmaps['viridis'], interpolation='nearest')
             
             dists = pairwise_distances(clicked, self.page_coords[page_id])
             selection = np.argmin(dists)
@@ -552,7 +673,21 @@ class SheetManager(QtGui.QMainWindow, form_class):
             x_max = x_min + 200
             plt.xlim([x_min, x_max])
             plt.ylim([0, self.spec.shape[0]])
-            
+
+            plt.ylabel('%d Frequency Bins' % self.spec.shape[0], fontsize=self.axis_label_fs)
+            plt.xlabel('Frame', fontsize=self.axis_label_fs)
+
+            # plot midi matrix
+            if self.midi_matrix is not None:
+                plt.subplot(2, 1, 2)
+                plt.imshow(np.max(self.midi_matrix) - self.midi_matrix, aspect='auto', cmap=plt.cm.gray, interpolation='nearest',
+                           vmin=0, vmax=np.max(self.midi_matrix))
+                plt.plot([onset, onset], [0, self.midi_matrix.shape[0]], 'k-', linewidth=2.0, alpha=0.5)
+                plt.ylim([0, self.midi_matrix.shape[0]])
+                plt.xlim([x_min, x_max])
+                plt.ylabel("%d Midi Pitches" % self.midi_matrix.shape[0])
+                plt.xlabel('Frame', fontsize=self.axis_label_fs)
+
             plt.draw()
             plt.pause(0.1)
             return
@@ -663,7 +798,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             print "Removed note with id:", selection
         
         # update sheet statistics
-        self.update_sheet_statistics()        
+        self.update_sheet_statistics()
         
         # refresh view
         self.sort_note_coords()
@@ -736,6 +871,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # refresh view
         self.sort_note_coords()
+
+        # update sheet statistics
+        self.update_sheet_statistics()
+
         self.plot_sheet()
 
         self.status_label.setText("done!")
@@ -758,6 +897,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # sort detected bars
         self.sort_bar_coords()
+
+        # update sheet statistics
+        self.update_sheet_statistics()
 
         # refresh view
         self.plot_sheet()
@@ -782,6 +924,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # convert systems to rois
         self.systems_to_rois()
+
+        # update sheet statistics
+        self.update_sheet_statistics()
 
         # refresh view
         self.plot_sheet()
