@@ -13,7 +13,7 @@ import numpy as np
 # first call
 # convert -density 150 Mozart_Piano_Sonata_Facile.pdf -quality 90 page.png
 
-img_dir = "/home/matthias/cp/data/sheet_localization/real_music/Mozart_Sonata_k309_3rd_movement/sheet/"
+img_dir = "/home/matthias/cp/data/sheet_localization/music_db/210_Ludwig van Beethoven_Piano_Sonata_No_1_Op_2_No_1_1st movement/sheet/"
 
 target_width = 835
 

@@ -23,7 +23,7 @@ from sklearn.metrics.pairwise import pairwise_distances
 from collections import defaultdict
 
 from midi_parser import MidiParser, notes_to_onsets, FPS
-from score_alignment.lilypond_note_coords.render_audio import render_audio
+from render_audio import render_audio
 
 from lasagne_wrapper.utils import BColors
 col = BColors()

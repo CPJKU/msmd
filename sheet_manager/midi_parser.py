@@ -18,7 +18,8 @@ import music21
 import madmom.utils.midi as mm_midi
 # import madmom.utils.midi_old as mm_midi
 from madmom.audio.signal import SignalProcessor, FramedSignalProcessor
-from madmom.audio.spectrogram import LogarithmicFilteredSpectrogramProcessor
+from madmom.audio.filters import LogarithmicFilterbank
+from madmom.audio.spectrogram import FilteredSpectrogramProcessor, LogarithmicSpectrogramProcessor
 from madmom.processors import SequentialProcessor
 
 # init signal processing
@@ -28,8 +29,9 @@ FPS = 20
 
 sig_proc = SignalProcessor(num_channels=1, sample_rate=SAMPLE_RATE)
 fsig_proc = FramedSignalProcessor(frame_size=FRAME_SIZE, fps=FPS, origin='future')
-spec_proc = LogarithmicFilteredSpectrogramProcessor(num_bands=16, fmin=30, fmax=6000)  # num_bands=24, fmin=30, fmax=8000
-processor = SequentialProcessor([sig_proc, fsig_proc, spec_proc])
+spec_proc = FilteredSpectrogramProcessor(LogarithmicFilterbank, num_bands=16, fmin=30, fmax=6000)  # num_bands=24, fmin=30, fmax=8000
+log_spec_proc = LogarithmicSpectrogramProcessor()
+processor = SequentialProcessor([sig_proc, fsig_proc, spec_proc, log_spec_proc])
 
 colors = ['c', 'm', 'y']
 
@@ -86,7 +88,7 @@ class MidiParser(object):
             plt.figure('spec')
             plt.subplot(111)
             plt.subplots_adjust(top=1.0, bottom=0.0)
-            plt.imshow(Spec, cmap=plt.cm.jet, interpolation='nearest', aspect='auto', origin='lower')
+            plt.imshow(Spec, cmap='viridis', interpolation='nearest', aspect='auto', origin='lower')
             plt.colorbar()
 
         s = music21.midi.translate.midiFilePathToStream(midi_file_path)

@@ -4,6 +4,7 @@ from PyQt4 import QtCore, QtGui, Qt, uic
 import os
 import cv2
 import glob
+import shutil
 import pickle
 import numpy as np
 
@@ -20,12 +21,22 @@ from utils import sort_by_roi, natsort
 from colormaps import cmaps
 
 from midi_parser import MidiParser
-from multi_modality_hashing.utils.real_music_data import ROOT_DIR, tr_pieces
-PIECES = tr_pieces
 
-BPMs = [120]  # [100, 110, 120, 130]
-sound_fonts = ["Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM"]
+from omr.config.settings import DATA_ROOT as ROOT_DIR
+from omr.utils.data import MOZART_PIECES, BACH_PIECES, HAYDN_PIECES, BEETHOVEN_PIECES, CHOPIN_PIECES, SCHUBERT_PIECES, STRAUSS_PIECES
+PIECES = MOZART_PIECES + BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES + STRAUSS_PIECES
+
+TARGET_DIR = "/home/matthias/mounts/home@rechenknecht1/Data/sheet_localization/real_music_sf"
+# TARGET_DIR = "/home/matthias/cp/data/sheet_localization/real_music_sf"
+
+tempo_ratios = np.arange(0.9, 1.1, 0.025)  # [0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15]
+sound_fonts = ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]  # ["Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]
 # ["Steinway", "Acoustic_Piano", "Bright_Yamaha_Grand", "Unison", "Equinox_Grand_Pianos", "FluidR3_GM", "Premium_Grand_C7_24"]
+
+# todo: remove this
+PIECES = BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES
+tempo_ratios = [1.0]
+sound_fonts = ["Steinway"]
 
 
 class SheetManager(QtGui.QMainWindow, form_class):
@@ -68,6 +79,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
         self.pushButton_parseMidi.clicked.connect(self.parse_midi)
         self.pushButton_parseAllMidis.clicked.connect(self.parse_all_midis)
+        self.pushButton_copySheets.clicked.connect(self.copy_sheets)
+        self.pushButton_prepareAll.clicked.connect(self.prepare_all)
         self.pushButton_editCoords.clicked.connect(self.edit_coords)
         self.pushButton_loadSheet.clicked.connect(self.load_sheet)
         self.pushButton_loadCoords.clicked.connect(self.load_coords)
@@ -205,9 +218,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         Render audio from midi
         """
         self.status_label.setText("Rendering audio ...")
-        from score_alignment.lilypond_note_coords.render_audio import render_audio
-        for bpm in BPMs:
-            render_audio(self.midi_file, sound_font="Steinway", bpm=bpm, velocity=None)
+        from render_audio import render_audio
+        for ratio in tempo_ratios:
+            render_audio(self.midi_file, sound_font="Steinway", tempo_ratio=ratio, velocity=None)
         self.status_label.setText("done!")
 
     def render_all_audios(self):
@@ -215,26 +228,32 @@ class SheetManager(QtGui.QMainWindow, form_class):
         Render audio from midi
         """
         self.status_label.setText("Rendering audios ...")
-        from score_alignment.lilypond_note_coords.render_audio import render_audio
+        from render_audio import render_audio
 
         for i, piece in enumerate(PIECES):
             txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
             print(txt)
 
+            # compile directories
+            src_dir = os.path.join(ROOT_DIR, piece)
+            target_dir = os.path.join(TARGET_DIR, piece)
+            if not os.path.exists(target_dir):
+                os.makedirs(target_dir)
+
             # clean up folder
-            for f in glob.glob(os.path.join(ROOT_DIR, piece, "audio/*")):
+            for f in glob.glob(os.path.join(target_dir, "audio/*")):
                 os.remove(f)
 
             # get midi file name
-            midi_file = glob.glob(os.path.join(ROOT_DIR, piece, piece + '.mid*'))
+            midi_file = glob.glob(os.path.join(src_dir, piece + '.mid*'))
             if len(midi_file) == 0:
                 continue
             midi_file = midi_file[0]
 
             # render audios
-            for bpm in BPMs:
+            for ratio in tempo_ratios:
                 for sf in sound_fonts:
-                    render_audio(midi_file, sound_font=sf, bpm=bpm, velocity=None)
+                    render_audio(midi_file, sound_font=sf, tempo_ratio=ratio, velocity=None, target_dir=target_dir)
 
         self.status_label.setText("done!")
         print "done!"
@@ -295,6 +314,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
         onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
 
+        print "Loading spectrogram from:"
+        print spec_file_path
         self.spec = np.load(spec_file_path)
         self.onsets = np.load(onset_file_path)
 
@@ -312,11 +333,17 @@ class SheetManager(QtGui.QMainWindow, form_class):
             txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
             print(txt)
 
+            # create target folder
+            target_dir = os.path.join(TARGET_DIR, piece)
+            spec_dir = os.path.join(target_dir, "spec")
+            if not os.path.exists(spec_dir):
+                os.makedirs(spec_dir)
+
             # clean up folder
-            for f in glob.glob(os.path.join(ROOT_DIR, piece, "spec/*")):
+            for f in glob.glob(spec_dir + "/*"):
                 os.remove(f)
 
-            pattern = os.path.join(ROOT_DIR, piece) + "/audio/*.mid*"
+            pattern = target_dir + "/audio/*.mid*"
             for midi_file_path in glob.glob(pattern):
                 print "Processing", midi_file_path
 
@@ -324,9 +351,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 directory = os.path.dirname(midi_file_path)
                 file_name = os.path.basename(midi_file_path).split('.')[0]
                 audio_file_path = os.path.join(directory, file_name + '.flac')
-                spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
-                onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
-                midi_matrix_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_midi.npy')
+                spec_file_path = os.path.join(spec_dir, file_name + '_spec.npy')
+                onset_file_path = os.path.join(spec_dir, file_name + '_onsets.npy')
+                midi_matrix_file_path = os.path.join(spec_dir, file_name + '_midi.npy')
 
                 # parse midi file
                 midi_parser = MidiParser(show=False)
@@ -338,8 +365,38 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 np.save(onset_file_path, onsets)
                 np.save(midi_matrix_file_path, midi_matrix)
 
+                # remove audio file to save disk space
+                os.remove(audio_file_path)
+
         self.status_label.setText("done!")
         print("done!")
+
+    def copy_sheets(self):
+        """
+        Copy sheets to target folder
+        """
+        self.status_label.setText("Copying sheets ...")
+
+        for i, piece in enumerate(PIECES):
+            txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
+            print(txt)
+
+            for folder in ["sheet", "coords"]:
+                src_dir = os.path.join(ROOT_DIR, piece, folder)
+                dst_dir = os.path.join(TARGET_DIR, piece, folder)
+
+                if os.path.exists(dst_dir):
+                    shutil.rmtree(dst_dir)
+                shutil.copytree(src_dir, dst_dir)
+
+        self.status_label.setText("done!")
+        print("done!")
+
+    def prepare_all(self):
+        """ Call all preparation steps for all audios """
+        self.render_all_audios()
+        self.parse_all_midis()
+        self.copy_sheets()
 
     def load_sheet(self):
         """
@@ -562,7 +619,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # plot note coordinates
         if self.checkBox_showCoords.isChecked():
-            plt.plot(self.page_coords[page_id][:, 1], self.page_coords[page_id][:, 0], 'co')
+            plt.plot(self.page_coords[page_id][:, 1], self.page_coords[page_id][:, 0], 'co', alpha=0.6)
 
         # plot systems
         if self.checkBox_showSystems.isChecked():
