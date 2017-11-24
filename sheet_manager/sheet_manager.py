@@ -888,19 +888,19 @@ class SheetManager(QtGui.QMainWindow, form_class):
         from omr.omr_app import OpticalMusicRecognizer
 
         # initialize note detection neural network
-        dump_file = "/home/matthias/experiments/omr/note_detector/params.pkl"
+        dump_file = "omr_models/note_params.pkl"
         net = note_model.build_model()
         note_net = SegmentationNetwork(net, print_architecture=False)
         note_net.load(dump_file)
 
         # initialize bar detection neural network
-        dump_file = "/home/matthias/experiments/omr/bar_detector/params.pkl"
+        dump_file = "omr_models/bar_params.pkl"
         net = bar_model.build_model()
         bar_net = SegmentationNetwork(net, print_architecture=False)
         bar_net.load(dump_file)
 
         # initialize system detection neural network
-        dump_file = "/home/matthias/experiments/omr/system_detector/params.pkl"
+        dump_file = "omr_models/system_params.pkl"
         net = system_model.build_model()
         system_net = SegmentationNetwork(net, print_architecture=False)
         system_net.load(dump_file)
