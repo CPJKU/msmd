@@ -24,8 +24,9 @@ from collections import defaultdict
 
 from midi_parser import MidiParser, notes_to_onsets, FPS
 from render_audio import render_audio
+from utils import BColors
 
-from lasagne_wrapper.utils import BColors
+# from lasagne_wrapper.utils import BColors
 col = BColors()
 
 # ROOT_DIR = "/media/matthias/Data/Data/umc_export/"

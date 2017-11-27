@@ -3,6 +3,29 @@ import numpy as np
 import matplotlib.path as mplPath
 
 
+# init color printer
+class BColors:
+    """
+    Colored command line output formatting
+    """
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+    def __init__(self):
+        """ Constructor """
+        pass
+
+    def print_colored(self, string, color):
+        """ Change color of string """
+        return color + string + BColors.ENDC
+
+
 def sort_by_rows(coords, start_pos, window=40, window_top=None, window_bottom=None):
     """
     group annotations by rows
