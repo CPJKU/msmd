@@ -220,7 +220,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("Rendering audio ...")
         from render_audio import render_audio
         for ratio in tempo_ratios:
-            render_audio(self.midi_file, sound_font="Steinway", tempo_ratio=ratio, velocity=None)
+            render_audio(self.midi_file, sound_font="FluidR3_GM", tempo_ratio=ratio, velocity=None)
         self.status_label.setText("done!")
 
     def render_all_audios(self):
