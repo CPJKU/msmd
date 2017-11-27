@@ -4,4 +4,6 @@ madmom>=0.15.1
 matplotlib>=2.0.2
 music21>3.1.0
 numpy>=1.13.1
-scikit-learn>=0.17
+opencv3>=3.1.0
+pyqt>=4.11.4
+scikit-learn>=0.17.1
