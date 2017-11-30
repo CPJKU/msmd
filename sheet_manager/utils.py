@@ -26,6 +26,18 @@ class BColors:
         return color + string + BColors.ENDC
 
 
+def get_target_shape(img, target_width):
+    """Given a target image width, compute the target height for resizing
+    the given image without changing its aspect ratio.
+
+    :returns: ``(target_height, target_width)`` in integers.
+    """
+    ratio = float(target_width) / img.shape[1]
+    target_height = img.shape[0] * ratio
+
+    return int(target_height), int(target_width)
+
+
 def sort_by_rows(coords, start_pos, window=40, window_top=None, window_bottom=None):
     """
     group annotations by rows
@@ -49,9 +61,14 @@ def sort_by_rows(coords, start_pos, window=40, window_top=None, window_bottom=No
 
 def sort_by_roi(coords, rois):
     """
-    group annotations by system
+    group annotations by system, if systems are available.
     """
 
+    # !!!!!!!!!!!!!!
+    # This is where the noteheads are aligned against the MIDI.
+    # The coordinates of noteheads are sorted into systems
+    # and left-to-right within a system.
+    # The coordinates of onsets are simply taken from the MIDI ordering.
     row_sorted_coords = np.zeros((0, 2), dtype=np.float32)
 
     for roi in rois:

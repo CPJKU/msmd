@@ -141,7 +141,24 @@
           </property>
          </widget>
         </item>
+        <item row="3" column="2">
+         <widget class="QLineEdit" name="lineEdit_pdf"/>
+        </item>
         <item row="3" column="0">
+         <widget class="QLabel" name="label_4">
+          <property name="text">
+           <string>pdf</string>
+          </property>
+         </widget>
+        </item>
+        <item row="3" column="3">
+         <widget class="QPushButton" name="pushButton_4">
+          <property name="text">
+           <string>Select</string>
+          </property>
+         </widget>
+        </item>
+        <item row="4" column="0">
          <spacer name="verticalSpacer_2">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
@@ -169,7 +186,7 @@
         <string>Generate</string>
        </attribute>
        <layout class="QGridLayout" name="gridLayout_4">
-        <item row="0" column="1">
+        <item row="1" column="1">
          <widget class="QCheckBox" name="checkBox_showSheet">
           <property name="layoutDirection">
            <enum>Qt::RightToLeft</enum>
@@ -180,34 +197,48 @@
          </widget>
         </item>
         <item row="0" column="0">
+         <widget class="QPushButton" name="pushButton_ly2PdfMidi">
+          <property name="text">
+           <string>Lily to Pdf+MIDI</string>
+          </property>
+         </widget>         
+        </item>
+        <item row="1" column="0">
          <widget class="QPushButton" name="pushButton_pdf2Img">
           <property name="text">
            <string>PDF to Image</string>
           </property>
          </widget>
         </item>
-        <item row="4" column="0">
+        <item row="2" column="0">
+         <widget class="QPushButton" name="pushButton_pdf2Coords">
+          <property name="text">
+           <string>PDF to Coords</string>
+          </property>
+         </widget>
+        </item>        
+        <item row="5" column="0">
          <widget class="QPushButton" name="pushButton_parseMidi">
           <property name="text">
            <string>Parse Midis</string>
           </property>
          </widget>
         </item>
-        <item row="2" column="0">
+        <item row="3" column="0">
          <widget class="QPushButton" name="pushButton_renderAudio">
           <property name="text">
            <string>Render Audios</string>
           </property>
          </widget>
         </item>
-        <item row="5" column="0">
+        <item row="6" column="0">
          <widget class="QPushButton" name="pushButton_loadSpectrogram">
           <property name="text">
            <string>Load Spectrogram</string>
           </property>
          </widget>
         </item>
-        <item row="4" column="1">
+        <item row="5" column="1">
          <widget class="QCheckBox" name="checkBox_computeSpec">
           <property name="layoutDirection">
            <enum>Qt::RightToLeft</enum>
@@ -220,7 +251,7 @@
           </property>
          </widget>
         </item>
-        <item row="6" column="0">
+        <item row="7" column="0">
          <spacer name="verticalSpacer_6">
           <property name="orientation">
            <enum>Qt::Vertical</enum>
@@ -233,7 +264,7 @@
           </property>
          </spacer>
         </item>
-        <item row="4" column="2">
+        <item row="5" column="2">
          <widget class="QCheckBox" name="checkBox_showSpec">
           <property name="layoutDirection">
            <enum>Qt::RightToLeft</enum>

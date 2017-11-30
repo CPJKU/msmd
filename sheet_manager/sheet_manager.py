@@ -1,7 +1,8 @@
-
+from __future__ import print_function
 from PyQt4 import QtCore, QtGui, Qt, uic
 
 import os
+import copy
 import cv2
 import glob
 import shutil
@@ -17,7 +18,8 @@ from matplotlib.collections import PatchCollection
 
 form_class = uic.loadUiType("gui/main.ui")[0]
 
-from utils import sort_by_roi, natsort
+from utils import sort_by_roi, natsort, get_target_shape
+from pdf_parser import pdf2coords
 from colormaps import cmaps
 
 from midi_parser import MidiParser
@@ -74,6 +76,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # connect to buttons
         self.pushButton_mxml2midi.clicked.connect(self.mxml2midi)
+        self.pushButton_ly2PdfMidi.clicked.connect(self.ly2pdf_and_midi)
+        self.pushButton_pdf2Coords.clicked.connect(self.pdf2coords)
         self.pushButton_loadSpectrogram.clicked.connect(self.load_spectrogram)
         self.pushButton_renderAudio.clicked.connect(self.render_audio)
         self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
@@ -95,10 +99,18 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.window_top = self.spinBox_window_top.value()
         self.window_bottom = self.spinBox_window_bottom.value()
 
+        self.target_width = 835
+
         if not os.path.exists("tmp"):
             os.mkdir("tmp")
 
+        self.lily_file = None
+        self.mxml_file = None
+        self.pdf_file = None
+        self.midi_file = None
+
         self.fig = None
+        self.fig_manager = None
         self.click_0 = None
         self.click_1 = None
         self.press = False
@@ -149,6 +161,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.mxml_file = os.path.join(self.folder_name, self.piece_name + '.xml')
         self.lily_file = os.path.join(self.folder_name, self.piece_name + '.ly')
         self.midi_file = glob.glob(os.path.join(self.folder_name, self.piece_name) + '.mid*')
+        self.pdf_file = os.path.join(self.folder_name, self.piece_name + self.sheet_version + '.pdf')
 
         if len(self.midi_file) == 0:
             self.midi_file = ""
@@ -162,9 +175,63 @@ class SheetManager(QtGui.QMainWindow, form_class):
         if not os.path.exists(self.lily_file):
             self.lily_file = ""
 
+        if not os.path.exists(self.pdf_file):
+            self.pdf_file = ""
+
         # set gui elements
         self.lineEdit_mxml.setText(self.mxml_file)
         self.lineEdit_lily.setText(self.lily_file)
+        self.lineEdit_midi.setText(self.midi_file)
+        self.lineEdit_pdf.setText(self.pdf_file)
+
+    def ly2pdf_and_midi(self):
+        """Convert the LilyPond file to PDF and MIDI (which is done automatically, if the Ly
+        file contains the \midi { } directive)."""
+        self.status_label.setText("Convert Ly to pdf ...")
+        if not os.path.isfile(self.lily_file):
+            self.status_label.setText("done! (Error: LilyPond file not found!)")
+            print('Error: LilyPond file not found!')
+            return
+
+        # Set PDF paths. LilyPond needs the output path without the .pdf suffix
+        pdf_path_nosuffix = os.path.join(self.folder_name, self.piece_name + self.sheet_version)
+        pdf_path = pdf_path_nosuffix + '.pdf'
+
+        cmd_base = 'lilypond'
+        cmd_point_and_click = ' -e"(ly:set-option \'point-and-click \'(note-event))"'
+        cmd_suppress_midi = '-e"(set! write-performances-midis (lambda (performances basename . rest) 0))"'
+
+        # Do not overwrite an existing MIDI file.
+        suppress_midi = False
+        if os.path.isfile(self.midi_file):
+            suppress_midi = True
+
+        cmd_options = cmd_point_and_click
+        if suppress_midi:
+            cmd_options += ' {0}'.format(cmd_suppress_midi)
+
+        cmd = cmd_base + ' -o {0} '.format(pdf_path_nosuffix) + cmd_options + ' {0}'.format(self.lily_file)
+
+        # Run LilyPond here.
+        os.system(cmd)
+
+        # If successful, the PDF file will be there:
+        if os.path.isfile(pdf_path):
+            self.pdf_file = pdf_path
+            self.lineEdit_pdf.setText(self.pdf_file)
+        else:
+            print('Warning: LilyPond did not generate PDF file.')
+            return
+
+        # Check if the MIDI file was actually created.
+        output_midi_file = os.path.join(self.folder_name, self.piece_name) + '.mid'
+        if not os.path.isfile(output_midi_file):
+            output_midi_file += 'i'
+            if not os.path.isfile(output_midi_file):
+                print('Warning: LilyPond did not generate corresponding MIDI file. Check *.ly source'
+                      ' file for \\midi { } directive.')
+                return
+        self.midi_file = output_midi_file
         self.lineEdit_midi.setText(self.midi_file)
 
     def pdf2img(self):
@@ -178,7 +245,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.status_label.setText("Resizing images ...")
         img_dir = os.path.join(self.folder_name, self.sheet_folder)
-        target_width = 835
 
         file_paths = glob.glob("tmp/*.png")
         file_paths = natsort(file_paths)
@@ -186,16 +252,64 @@ class SheetManager(QtGui.QMainWindow, form_class):
             img = cv2.imread(img_path, -1)
 
             # compute resize stats
-            ratio = float(target_width) / img.shape[1]
-            target_height = img.shape[0] * ratio
-
-            target_width = int(target_width)
-            target_height = int(target_height)
+            target_height, target_width = get_target_shape(img, self.target_width)
+            #
+            # ratio = float(self.target_width) / img.shape[1]
+            # target_height = img.shape[0] * ratio
+            #
+            # target_width = int(target_width)
+            # target_height = int(target_height)
 
             img_rsz = cv2.resize(img, (target_width, target_height))
 
             out_path = os.path.join(img_dir, "%02d.png" % (i + 1))
             cv2.imwrite(out_path, img_rsz)
+
+        self.status_label.setText("done!")
+
+    def pdf2coords(self):
+        print("Extracting coords from pdf ...")
+        self.status_label.setText("Extracting coords from pdf ...")
+
+        if not os.path.exists(self.pdf_file):
+            self.status_label.setText("Extracting coords from pdf failed: PDF file not found!")
+            print("Extracting coords from pdf failed: PDF file not found: {0}".format(self.pdf_file))
+            return
+
+        self.load_sheet()
+        n_pages = len(self.page_coords)
+        if n_pages == 0:
+            self.status_label.setText("Extracting coords from pdf failed: could not find sheet!")
+
+            print("Extracting coords from pdf failed: could not find sheet!"
+                  " Generate the image files first.")
+            return
+
+        # Run PDF coordinate extraction
+        centroids = pdf2coords(self.pdf_file, target_width=self.target_width)
+
+        # Check that the PDF corresponds to the generated images...
+        if len(centroids) != n_pages:
+            print("Something is wrong with the PDF vs. the generated images: page count"
+                  " does not match (PDF parser: {0} pages, images: {1})."
+                  " Re-generate the images from PDF.".format(len(centroids), n_pages))
+            return
+
+        # Derive no. of pages from centroids
+        for page_id in centroids:
+            print('Page {0}: {1} note events found'.format(page_id, centroids[page_id].shape[0]))
+            self.page_coords[page_id] = centroids[page_id]
+
+        # Save the coordinates
+        self.save_coords()
+
+        # refresh view
+        self.sort_note_coords()
+
+        # update sheet statistics
+        self.update_sheet_statistics()
+
+        # self.plot_sheet()
 
         self.status_label.setText("done!")
 
@@ -256,7 +370,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                     render_audio(midi_file, sound_font=sf, tempo_ratio=ratio, velocity=None, target_dir=target_dir)
 
         self.status_label.setText("done!")
-        print "done!"
+        print("done!")
 
     def parse_midi(self):
         """
@@ -268,7 +382,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         
         pattern = self.folder_name + "/audio/*.mid*"
         for midi_file_path in glob.glob(pattern):
-            print "Processing", midi_file_path
+            print("Processing", midi_file_path)
 
             # get file names and directories
             directory = os.path.dirname(midi_file_path)
@@ -314,8 +428,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
         onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
 
-        print "Loading spectrogram from:"
-        print spec_file_path
+        print("Loading spectrogram from:")
+        print(spec_file_path)
         self.spec = np.load(spec_file_path)
         self.onsets = np.load(onset_file_path)
 
@@ -345,7 +459,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
             pattern = target_dir + "/audio/*.mid*"
             for midi_file_path in glob.glob(pattern):
-                print "Processing", midi_file_path
+                print("Processing", midi_file_path)
 
                 # get file names and directories
                 directory = os.path.dirname(midi_file_path)
@@ -516,15 +630,21 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 self.page_rois[i].append(np.asarray([topLeft, topRight, bottomRight, bottomLeft]))
 
     def sort_note_coords(self):
-        """ Sort note coordinates by rows """
+        """ Sort note coordinates by systems (ROIs).
+
+        By default, this filters out note coordinates that are not associated
+        with any system. However, if there are no systems for a given page,
+        it just returns the coords in the original order.
+        """
         
         for page_id in xrange(self.n_pages):
-            page_coords = self.page_coords[page_id]
             page_rois = self.page_rois[page_id]
 
-            page_coords = sort_by_roi(page_coords, page_rois)
-
-            self.page_coords[page_id] = page_coords
+            if page_rois:
+                page_coords = self.page_coords[page_id]
+                page_coords = sort_by_roi(page_coords, page_rois)
+                # A more robust alignment procedure can be plugged here.
+                self.page_coords[page_id] = page_coords
 
     def sort_bar_coords(self):
         """ Sort bar coords by rows """
@@ -591,6 +711,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # show sheet image along coordinates
         self.fig = plt.figure("Sheet Editor")
 
+        # self.fig_manager = plt.get_current_fig_manager()
+        def notify_axes_change_print(fig):
+            print('Figure {0}: Axes changed!'.format(fig))
+        self.fig.add_axobserver(notify_axes_change_print)
+
         # init events
         self.fig.canvas.mpl_connect('button_press_event', self.on_press)
         self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
@@ -598,22 +723,53 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.plot_sheet()
 
-    def plot_sheet(self):
+    def plot_sheet(self, xlim=None, ylim=None):
         """
         Plot sheet image along with coordinates
         """
 
+        print('Calling plot_sheet')
+
+
+        # Preserving the view/zoom history
+        prev_toolbar = plt.gcf().canvas.toolbar
+        _prev_view_elements = copy.deepcopy(prev_toolbar._views._elements)
+        _prev_position_elements = [[tuple([eee.frozen() for eee in ee]) for ee in e]
+                           for e in prev_toolbar._positions._elements]
+        # _xypress = copy.deepcopy(prev_toolbar._xypress)  # the location and axis info at the time
+        #                       # of the press
+        # _idPress = copy.deepcopy(prev_toolbar._idPress)
+        # _idRelease = copy.deepcopy(prev_toolbar._idRelease)
+        # _active = copy.deepcopy(prev_toolbar._active)
+        # _lastCursor = copy.deepcopy(prev_toolbar._lastCursor)
+        # _ids_zoom = copy.deepcopy(prev_toolbar._ids_zoom)
+        # _zoom_mode = copy.deepcopy(prev_toolbar._zoom_mode)
+        # _button_pressed = copy.deepcopy(prev_toolbar._button_pressed)  # determined by the button pressed
+        #                              # at start
+        # mode = copy.deepcopy(prev_toolbar.mode)  # a mode string for the status bar
+
+        print('...previous views: {0}'.format(_prev_view_elements))
+        print('...previous positions: {0}'.format(_prev_position_elements))
+        print('---orig positions: {0}'.format(prev_toolbar._positions._elements))
+
         # get data of current page
         page_id = self.spinBox_page.value()
 
-        self.fig.clf()
+        self.fig.clf(keep_observers=True)
 
         # plot sheet image
+        # ax = self.fig.gca()
         ax = plt.subplot(111)
+        # in_ax_compr = pickle.dumps(in_ax)
+        # ax_cpy = pickle.loads(in_ax_compr)
+        # ax = ax_cpy.subplot(111)
+
         plt.subplots_adjust(top=0.98, bottom=0.05)
         plt.imshow(self.sheet_pages[page_id], cmap=plt.cm.gray, interpolation='nearest')
+
         plt.xlim([0, self.sheet_pages[page_id].shape[1] - 1])
         plt.ylim([self.sheet_pages[page_id].shape[0] - 1, 0])
+
         plt.xlabel("%d Pixel" % self.sheet_pages[page_id].shape[1], fontsize=self.axis_label_fs)
         plt.ylabel("%d Pixel" % self.sheet_pages[page_id].shape[0], fontsize=self.axis_label_fs)
 
@@ -648,8 +804,70 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 plt.text(bar[0, 1], bar[0, 0], i, color='b', ha='center', va='bottom',
                          bbox=dict(facecolor='w', edgecolor='b', boxstyle='round,pad=0.2'))
 
+        print('Requesting zoom: xlim = {0}, ylim = {1}'.format(xlim, ylim))
+
+        # if (xlim is not None) and (ylim is not None):
+
+        # plt.draw()
+
+        # plt.gcf().canvas.toolbar = prev_toolbar
+
+        # plt.xlim(xlim)
+        # plt.ylim(ylim)
+        #
+        #
+        # # In order for the Home button to work properly, we need to push the original
+        # # size of the figure to the NavigationToolbar's stack of views.
+        # toolbar = plt.gcf().canvas.toolbar
+        # # plt.draw()
+        # views = toolbar._views
+        # #print(views._elements)
+        # orig_xmin, orig_xmax = [0, self.sheet_pages[page_id].shape[1] - 1]
+        # orig_ymin, orig_ymax = [self.sheet_pages[page_id].shape[0] - 1, 0]
+        # orig_view = [(orig_xmin, orig_xmax, orig_ymin, orig_ymax)]
+        # views.push(orig_view)
+        # views.bubble(orig_view)
+        #
+        # # if len(_prev_positions) > 0:
+        # #     orig_position = _prev_positions[0]
+        # #     positions = toolbar._positions
+        # #     positions.push(orig_position)
+        # #     positions.bubble(orig_position)
+        #
+
         plt.draw()
+
         plt.pause(0.1)
+        # plt.show()
+
+        # toolbar._views._elements += _prev_views  # Contains the current view as well
+        # toolbar._positions._elements += _prev_positions
+        #
+        # # else:
+        # #     plt.xlim([0, self.sheet_pages[page_id].shape[1] - 1])
+        # #     plt.ylim([self.sheet_pages[page_id].shape[0] - 1, 0])
+        # in_ax.upate_from(ax)
+        ### toolbar = plt.gcf().canvas.toolbar
+        ### toolbar._views._elements = _prev_view_elements
+        ### toolbar._positions._elements = _prev_position_elements
+        # toolbar._xypress = copy.deepcopy(prev_toolbar._xypress)  # the location and axis info at the time
+        #                       # of the press
+        # toolbar._idPress = copy.deepcopy(prev_toolbar._idPress)
+        # toolbar._idRelease = copy.deepcopy(prev_toolbar._idRelease)
+        # toolbar._active = copy.deepcopy(prev_toolbar._active)
+        # toolbar._lastCursor = copy.deepcopy(prev_toolbar._lastCursor)
+        # toolbar._ids_zoom = copy.deepcopy(prev_toolbar._ids_zoom)
+        # toolbar._zoom_mode = copy.deepcopy(prev_toolbar._zoom_mode)
+        # toolbar._button_pressed = copy.deepcopy(prev_toolbar._button_pressed)  # determined by the button pressed
+        #                              # at start
+        # toolbar.mode = copy.deepcopy(prev_toolbar.mode)  # a mode string for the status bar
+
+        plt.gcf().canvas.toolbar._update_view()
+
+        print('Views redrawing 2x: ')
+        print(plt.gcf().canvas.toolbar._views._elements)
+        print('Positions after drawing 2x: ')
+        print(plt.gcf().canvas.toolbar._positions._elements)
 
     def on_press(self, event):
         """
@@ -692,6 +910,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """
         Sheet has been clicked event
         """
+        print('Calling: on_release, with event {0}'.format(event))
+        # Preserving the view/zoom history
+        _prev_views = plt.gcf().canvas.toolbar._views._elements
+        _prev_positions = plt.gcf().canvas.toolbar._positions._elements
+        print('...previous views: {0}'.format(_prev_views))
+        print('...previous positions: {0}'.format(_prev_positions))
+
         from sklearn.metrics.pairwise import pairwise_distances
 
         # reset bounding box drawing
@@ -705,8 +930,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
         
         # position of click
         clicked = np.asarray([event.ydata, event.xdata]).reshape([1, 2])
-        
+
+        #
+
         # right click (open spectrogram and highlight note's onset)
+        # Note: this has a conflict with the usage of right-click to zoom out.
+        # That was not apparent until we started playing around with retaining the zoom.
+        # Maybe: better to change this to double-click?
         if event.button == 3:
             
             plt.figure("Spectrogram")
@@ -787,7 +1017,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
                     # remove system
                     self.page_systems[page_id] = np.delete(self.page_systems[page_id], i, axis=0)
-                    print "Removed system with id:", i
+                    print("Removed system with id:", i)
                     break
 
             self.systems_to_rois()
@@ -829,7 +1059,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
             # remove coordinate
             self.page_bars[page_id] = np.delete(self.page_bars[page_id], selection, axis=0)
-            print "Removed bar with id:", selection
+            print("Removed bar with id:", selection)
 
         # add note position
         if self.radioButton_addNote.isChecked():
@@ -852,15 +1082,18 @@ class SheetManager(QtGui.QMainWindow, form_class):
             
             # remove coordinate
             self.page_coords[page_id] = np.delete(self.page_coords[page_id], selection, axis=0)
-            print "Removed note with id:", selection
+            print("Removed note with id:", selection)
         
         # update sheet statistics
         self.update_sheet_statistics()
         
-        # refresh view
+        # update notehead-onset alignment
         self.sort_note_coords()
         self.sort_bar_coords()
-        self.plot_sheet()
+
+        # refresh view
+        xlim, ylim = plt.gca().get_xlim(), plt.gca().get_ylim()
+        self.plot_sheet(xlim=xlim, ylim=ylim)
 
     def update_staff_windows(self):
         """

@@ -78,13 +78,16 @@ class MidiParser(object):
         """
 
         # compute spectrogram
+        Spec = None
         if audio_path is not None:
+            print('Computing spectrogram from audio path: {0}'.format(audio_path))
+            if not os.path.isfile(audio_path):
+                print('...audio file does not exist!')
+
             Spec = processor(audio_path).T
-        else:
-            Spec = None
 
         # show results
-        if self.show:
+        if self.show and Spec is not None:
             plt.figure('spec')
             plt.subplot(111)
             plt.subplots_adjust(top=1.0, bottom=0.0)
