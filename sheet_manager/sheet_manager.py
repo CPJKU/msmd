@@ -109,6 +109,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.pdf_file = None
         self.midi_file = None
 
+        self.lily_normalized_file = None
+
         self.fig = None
         self.fig_manager = None
         self.click_0 = None
@@ -163,6 +165,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.midi_file = glob.glob(os.path.join(self.folder_name, self.piece_name) + '.mid*')
         self.pdf_file = os.path.join(self.folder_name, self.piece_name + self.sheet_version + '.pdf')
 
+        self.lily_normalized_file = os.path.join(self.folder_name, self.piece_name + '.norm.ly')
+
         if len(self.midi_file) == 0:
             self.midi_file = ""
         else:
@@ -174,6 +178,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         if not os.path.exists(self.lily_file):
             self.lily_file = ""
+            self.lily_normalized_file = ""
 
         if not os.path.exists(self.pdf_file):
             self.pdf_file = ""
@@ -187,8 +192,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
     def ly2pdf_and_midi(self):
         """Convert the LilyPond file to PDF and MIDI (which is done automatically, if the Ly
         file contains the \midi { } directive)."""
+        self.normalize_ly()
+
         self.status_label.setText("Convert Ly to pdf ...")
-        if not os.path.isfile(self.lily_file):
+        if not os.path.isfile(self.lily_normalized_file):
             self.status_label.setText("done! (Error: LilyPond file not found!)")
             print('Error: LilyPond file not found!')
             return
@@ -233,6 +240,44 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 return
         self.midi_file = output_midi_file
         self.lineEdit_midi.setText(self.midi_file)
+
+    def normalize_ly(self):
+        """ Converts lilypond file to absolute. There is a sanity check:
+        if there are too many consecutive apostrophes in the output file,
+        we assume that the file was already encoded as absolute, and keep
+        it without changes.
+
+        The backlinks from ly --> pdf generation lead to the **normalized**
+        LilyPond file!
+        """
+        if not os.path.exists(self.lily_file):
+            print('Cannot normalize, LilyPond file is missing!')
+            return
+
+        self.lily_normalized_file = os.path.join(self.folder_name, self.piece_name + '.norm.ly')
+        os.system('cp {0} {1}'.format(self.lily_file, self.lily_normalized_file))
+
+        if not os.path.exists(self.lily_normalized_file):
+            print('Initializing normalized LilyPond file {0} failed!')
+            return
+
+        base_cmd = 'ly rel2abs'
+        cmd = base_cmd + ' -i {0}'.format(self.lily_normalized_file)
+
+        os.system(cmd)
+
+        # Check if the normalization didn't produce an absurd number of apostrophes.
+        # That would be a sign of having interpreted an absolute file as relative.
+        with open(self.lily_normalized_file) as hdl:
+            ly_str = ''.join([l for l in hdl])
+
+        LY_SANITY_CHECK_TOKEN = "''''''"
+        if LY_SANITY_CHECK_TOKEN in ly_str:
+            print('...found five apostrophes in normalized LilyPond file,'
+                  ' which should not happen in absolute-encoded music.'
+                  ' We probably already had an absolute file. Returning back'
+                  ' to original file.')
+            os.system('cp {0} {1}'.format(self.lily_file, self.lily_normalized_file))
 
     def pdf2img(self):
         """ Convert pdf file to image """
