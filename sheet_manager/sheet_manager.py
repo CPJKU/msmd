@@ -84,7 +84,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.pushButton_parseMidi.clicked.connect(self.parse_midi)
         self.pushButton_parseAllMidis.clicked.connect(self.parse_all_midis)
         self.pushButton_copySheets.clicked.connect(self.copy_sheets)
-        self.pushButton_prepareAll.clicked.connect(self.prepare_all)
+        self.pushButton_prepareAll.clicked.connect(self.prepare_all_audio)
         self.pushButton_editCoords.clicked.connect(self.edit_coords)
         self.pushButton_loadSheet.clicked.connect(self.load_sheet)
         self.pushButton_loadCoords.clicked.connect(self.load_coords)
@@ -265,6 +265,14 @@ class SheetManager(QtGui.QMainWindow, form_class):
             out_path = os.path.join(img_dir, "%02d.png" % (i + 1))
             cv2.imwrite(out_path, img_rsz)
 
+            if self.checkBox_showSheet.isChecked():
+                plt.figure()
+                plt.title('{0}, page {1}'.format(self.piece_name, i+1))
+                plt.imshow(img_rsz, cmap=plt.cm.gray)
+
+        if self.checkBox_showSheet.isChecked():
+            plt.show()
+
         self.status_label.setText("done!")
 
     def pdf2coords(self):
@@ -301,7 +309,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.page_coords[page_id] = centroids[page_id]
 
         # Save the coordinates
-        self.save_coords()
+        self.save_note_coords()
 
         # refresh view
         self.sort_note_coords()
@@ -309,7 +317,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # update sheet statistics
         self.update_sheet_statistics()
 
-        # self.plot_sheet()
+        if self.checkBox_showExtractedCoords.isChecked():
+            # Maybe we already have the ROIs for this image.
+            self.load_coords()
+            self.sort_note_coords()
+            self.update_sheet_statistics()
+            self.edit_coords()
 
         self.status_label.setText("done!")
 
@@ -506,7 +519,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("done!")
         print("done!")
 
-    def prepare_all(self):
+    def prepare_all_audio(self):
         """ Call all preparation steps for all audios """
         self.render_all_audios()
         self.parse_all_midis()
@@ -694,14 +707,28 @@ class SheetManager(QtGui.QMainWindow, form_class):
     
     def save_coords(self):
         """ Save changed sheet coords """
+        self.save_system_coords()
+        self.save_bar_coords()
+        self.save_note_coords()
+
+    def save_note_coords(self):
+        """ Save current note coordinates. """
         coord_dir = os.path.join(self.folder_name, self.coord_folder)
         for i in xrange(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "notes_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_coords[i])
 
+    def save_bar_coords(self):
+        """ Save current bar coordinates. """
+        coord_dir = os.path.join(self.folder_name, self.coord_folder)
+        for i in xrange(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "bars_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_bars[i])
 
+    def save_system_coords(self):
+        """ Save current bar coordinates. """
+        coord_dir = os.path.join(self.folder_name, self.coord_folder)
+        for i in xrange(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "systems_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_systems[i])
 
@@ -804,7 +831,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 plt.text(bar[0, 1], bar[0, 0], i, color='b', ha='center', va='bottom',
                          bbox=dict(facecolor='w', edgecolor='b', boxstyle='round,pad=0.2'))
 
-        print('Requesting zoom: xlim = {0}, ylim = {1}'.format(xlim, ylim))
+        # print('Requesting zoom: xlim = {0}, ylim = {1}'.format(xlim, ylim))
 
         # if (xlim is not None) and (ylim is not None):
 
