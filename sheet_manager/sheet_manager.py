@@ -728,7 +728,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         Plot sheet image along with coordinates
         """
 
-        print('Calling plot_sheet')
+        # print('Calling plot_sheet')
 
 
         # Preserving the view/zoom history
@@ -748,9 +748,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         #                              # at start
         # mode = copy.deepcopy(prev_toolbar.mode)  # a mode string for the status bar
 
-        print('...previous views: {0}'.format(_prev_view_elements))
-        print('...previous positions: {0}'.format(_prev_position_elements))
-        print('---orig positions: {0}'.format(prev_toolbar._positions._elements))
+        # print('...previous views: {0}'.format(_prev_view_elements))
+        # print('...previous positions: {0}'.format(_prev_position_elements))
+        # print('---orig positions: {0}'.format(prev_toolbar._positions._elements))
 
         # get data of current page
         page_id = self.spinBox_page.value()
@@ -864,10 +864,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         plt.gcf().canvas.toolbar._update_view()
 
-        print('Views redrawing 2x: ')
-        print(plt.gcf().canvas.toolbar._views._elements)
-        print('Positions after drawing 2x: ')
-        print(plt.gcf().canvas.toolbar._positions._elements)
+        # print('Views redrawing 2x: ')
+        # print(plt.gcf().canvas.toolbar._views._elements)
+        # print('Positions after drawing 2x: ')
+        # print(plt.gcf().canvas.toolbar._positions._elements)
 
     def on_press(self, event):
         """
