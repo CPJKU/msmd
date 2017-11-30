@@ -667,6 +667,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
             page_bars = self.page_bars[page_id]
             page_systems = self.page_systems[page_id]
 
+            if page_systems.shape[0] == 0:
+                continue
+
             # check if bars and systems are present
             if page_bars.shape[0] == 0 or page_systems.shape[0] == 0:
                 break
@@ -747,6 +750,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.fig.canvas.mpl_connect('button_press_event', self.on_press)
         self.fig.canvas.mpl_connect('motion_notify_event', self.on_motion)
         self.fig.canvas.mpl_connect('button_release_event', self.on_release)
+
+        self.sort_note_coords()
+        self.sort_bar_coords()
 
         self.plot_sheet()
 
