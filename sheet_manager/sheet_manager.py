@@ -1,4 +1,239 @@
+"""Sheet Manager is a program for extracting a multimodal set of views
+of a piece of music from its encoding, such as a LilyPond or MusicXML file.
+There is an audio view, a sheet music view, a MIDI view, and others may be
+added.
+
+A GUI for manually editing the sheet music view is also provided.
+
+Workflow
+--------
+
+Each piece of music is represented as a directory. The source encoding file
+(*.ly or *.xml; in this example we assume a LilyPond file is available) is
+directly in that directory::
+
+  bach-example-1/
+    bach-example-1.ly
+
+The following representations (views) are generated directly from the source
+
+* PDF
+* MIDI
+
+Additional views are then generated into sub-folders. There is an audio view
+(or views, generated from MIDI using multiple sound-fonts and tempi), an image
+view (one PNG file per page, generated from the PDF), an OMR view (locations
+of relevant symbols and other structured information about the images of the
+score; derived from the image view with the help of some LilyPond PDF tricks),
+and a features (spec) view that represents the music as a feature matrix:
+a spectrogram, an onset map, and a MIDI matrix.::
+
+  bach-example-1/
+    bach-example-1.ly
+    bach-example-1.pdf
+    bach-example-1.midi
+    audio/
+      bach-example-1_tempo-X000_soundfont-A.flac
+      bach-example-1_tempo-Y000_soundfont-B.flac
+    sheet/
+      01.png
+      02.png
+      03.png
+    coords/
+      bars_01.npy
+      bars_02.npy
+      bars_03.npy
+      notes_01.npy
+      notes_02.npy
+      notes_03.npy
+      systems_01.npy
+      systems_02.npy
+      systems_03.npy
+    spec/
+      bach-example-1_tempo-X000_soundfont-A_midi.npy
+      bach-example-1_tempo-X000_soundfont-A_onsets.npy
+      bach-example-1_tempo-X000_soundfont-A_spec.npy
+      bach-example-1_tempo-Y000_soundfont-B_midi.npy
+      bach-example-1_tempo-Y000_soundfont-B_onsets.npy
+      bach-example-1_tempo-Y000_soundfont-B_spec.npy
+
+The Sheet Manager implements the processing pipeline and allows some manual
+editing. The workflow (for a LilyPond input) is:
+
+* Ly --> normalized Ly
+  * normalized Ly --> PDF
+    * PDF --> PNG
+      * PNG --> bar coords
+      * PNG --> system coords
+      * PNG --> note coords (MXML only)
+    * PDF + PNG --> note coords (LilyPond only)
+  * normalized Ly --> MIDI
+    * MIDI --> MIDI matrix
+    * MIDI --> onsets matrix
+    * MIDI --> audio
+      * Audio --> spectrogram
+
+Ly --> normalized Ly
+^^^^^^^^^^^^^^^^^^^^
+
+**Converts LilyPond ``\relative { }`` music to absolute.**
+
+LilyPond encoding is hard to standardize. It is a format for engraving,
+not really for representing the music per se, so the only actual parser
+just outputs PDF or MIDI. There is no working Ly --> MXML conversion,
+MXML --> Ly works barely and with errors, and except for LilyPond itself,
+no program is capable of producing correct MIDI.
+
+The major advantage of LilyPond is that we bypass the need for OMR
+on noteheads, because their locations can be extracted directly from
+the generated PDF. The second major advantage is that we can extract
+the pitch of each notehead directly from the lilypond file, because
+the PDF points to where the notehead was encoded.
+
+However, LilyPond has two ways of encoding pitch: *absolute* and *relative*.
+In absolute encoding, the pitch of a note is indicated absolutely:
+a C2 will always be marked as ``c,``, a D5 as ``d''``, etc., so
+the sequence C4, D4, F#5 would be encoded as ``c' d' fis''``. However,
+relative encoding interprets the pitch and octave with respect to
+the previous pitch, so the sequence ``c' d' fis''`` would mean
+C4, D5, F#6 -- each apostrophe is interpreted as an octave jump. To
+encode C4, D4, F#5 in relative encoding, we would write ``c' d fis'``:
+the apostrophe at ``fis'`` means "one octave above the ``fis`` closest
+to the previous note".
+
+Therefore, in order to be able to interpret the pitch of a notehead
+locally, from a single LilyPond tokend (e.g. ``fis'``), we require
+the absolute encoding. Fortunately, the ``python-ly`` package implements
+conversion to absolute encoding.
+
+
+Normalized Ly --> PDF
+^^^^^^^^^^^^^^^^^^^^^
+
+To render to PDF, we use the command::
+
+  lilypond -o $TARGET_PDF -e"(ly:set-option \'point-and-click \'(note-event))"
+
+The option ensures that the generated PDF contains xref anchors for each
+notehead.
+
+
+PDF --> PNG
+^^^^^^^^^^^
+
+The ``convert`` command is used to generate a PNG file for each page of the
+PDF file::
+
+  convert -density 150 $PDF_PATH -quality 90
+
+The PNG files are resized to a pre-configured ``target_width`` (by default,
+835 pixels) and saved into the ``sheet/`` subdirectory.
+
+.. note::
+
+  Sheet Manager can deal with pages of different aspect ratios in
+  one PDF; just note that the constant width means landscape pages
+  will be shrunk a lot.
+
+PDF + PNG --> note coords.
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Using the LilyPond-generated xrefs in the PDF file, we can extract locations
+of the noteheads from the PDF. The module ``sheet_manager.pdf_parser``
+implements this functionality, using the ``pdfminer`` package for parsing
+the PDF. The note coordinates are extracted for each page separately
+and stored as a ``*.npy`` file in the ``coords/`` subdirectory.
+
+The data format is an array of shape ``(n_noteheads, 2)``, where the first
+column contains the row and the second column the centroid of the given
+notehead with respect to the corresponding PNG of the given page.
+This re-scaling of the note coords is why we need to first generate the
+per-page PNG.
+
+
+PNG --> system/bar/note coords.
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Automated detectiion staff systems, barlines, and noteheads from the image
+view is provided using lightweight optical music recognition (OMR).
+(If you are using LilyPond input, you don't really need
+the notehead model, but you still need to detect staff systems and
+barlines.)
+Pre-trained models are provided. They are U-Nets, implemented
+in Lasagne/theano, which means that you need to set up this stack if
+you want to use OMR.
+
+You can edit the coordinates manually in a GUI editor (and you have
+to check for correctness through the GUI anyway).
+
+The coordinates of the symbols are stored per page into the ``coords/``
+subdirectory, as ``systems_01.npy, systems_02.npy, bars_01.npy,``
+``bars_02.npy, notes_01.npy, notes_02.npy``, etc.
+
+Normalized Ly --> MIDI
+^^^^^^^^^^^^^^^^^^^^^^
+
+MIDI is exported automatically during LilyPond file typesetting, based
+on the ``\midi { }`` directive in the normalized ``*.ly`` source file.
+By default, if the default MIDI file is already available, it is *not*
+overwritten: this is done by suppressing the MIDI output with option::
+
+  -e"(set! write-performances-midis (lambda (performances basename . rest) 0))"
+
+
+MIDI --> audio (+performance MIDI)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+From the MIDI file, we generate audio with ``fluidsynth``, a list
+of pre-configured soundfonts, and a list of pre-configured tempo
+settings::
+
+  fluidsynth -F $AUDIO_FILE -O s16 -T flac $SOUNDFONT $PERFORMANCE_MIDI
+
+Since the audio may be generated with a range of tempos (and possibly
+other MIDI processing operations), the ``$PERFORMANCE_MIDI`` file is created
+in the ``audio/`` subdirectory first, from which the audio is generated.
+
+Audio --> spectrogram
+^^^^^^^^^^^^^^^^^^^^^
+
+The spectrogram of each audio is created, using the ``madmom`` library.
+Signal processing configuration consists of a sample rate (default:
+22050), frame size (default: 2048), frames per second (FPS, default: 20),
+no. of frequency bands (default: 16), and frequency range (default: 30--6000).
+The spectrum is computed with a logarithmic filter bank. The spectrogram
+is saved into the ``spec/`` subdirectory; one for each performance
+(soundfont + tempo combination; see audio rendering).
+
+This functionality is implemented in the ``sheet_manager.midi_parser``
+module.
+
+
+Performance MIDI --> MIDI matrix, onsets
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The MIDI matrix is generated frame-wise with the pre-configured frame rate
+(``FPS``), matching the spectrogram generation frame rate. The onsets
+are a list, with the ``i``-th item corresponding to the frame at which
+the ``i``-th ``note-on`` MIDI event happens.
+Both features are saved into the ``spec/`` subdirectory; one MIDI matrix
+and onset list for each soundfont and tempo ratio (see above).
+
+This functionality is implemented in the ``sheet_manager.midi_parser``
+module.
+
+
+Supported source encodings
+--------------------------
+
+* LilyPond
+* MusicXML (relies heavily on OMR & needs a lot of manual annotation)
+
+"""
 from __future__ import print_function
+
+import argparse
+
 from PyQt4 import QtCore, QtGui, Qt, uic
 
 import os
@@ -1300,6 +1535,22 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.plot_sheet()
 
         self.status_label.setText("done!")
+
+##############################################################################
+
+
+
+def build_argument_parser():
+    parser = argparse.ArgumentParser(description=__doc__, add_help=True,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument('-v', '--verbose', action='store_true',
+                        help='Turn on INFO messages.')
+    parser.add_argument('--debug', action='store_true',
+                        help='Turn on DEBUG messages.')
+
+    return parser
+
 
 if __name__ == "__main__":
     """ main """
