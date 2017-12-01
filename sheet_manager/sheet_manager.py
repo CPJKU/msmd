@@ -169,6 +169,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.sheet_pages = None
         self.page_coords = None
         self.page_systems = None
+        self.page_rois = None
         self.page_bars = None
 
         self.sheet_version = None
@@ -183,6 +184,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.axis_label_fs = 16
 
         self.midi_matrix = None
+        self.spec = None
+        self.onsets = None
 
     def open_sheet(self):
         """Choose a piece directory to open through a dialog window.
@@ -400,6 +403,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
                   ' to original file.')
             os.system('cp {0} {1}'.format(self.lily_file, self.lily_normalized_file))
 
+        # Remove backup of normalized file
+        _ly_norm_backup_file = self.lily_normalized_file + '~'
+        if os.path.isfile(_ly_norm_backup_file):
+            os.unlink(_ly_norm_backup_file)
+
     def pdf2img(self):
         """ Convert pdf file to image """
 
@@ -494,7 +502,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def mxml2midi(self):
         """
-        Convert mxml to midi file
+        Convert mxml to midi file. Uses LilyPond as an intermediary.
         """
 
         # generate midi
@@ -672,8 +680,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def copy_sheets(self):
         """
-        Copy sheets to target folder
+        Copy sheets to target folder.
         """
+        warnings.warn('Copying sheets was an application-dependent operation'
+                      ' for extracting aligned png/audio patches for multimodal'
+                      ' score following.', DeprecationWarning)
         self.status_label.setText("Copying sheets ...")
 
         for i, piece in enumerate(PIECES):
@@ -693,13 +704,16 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def prepare_all_audio(self):
         """ Call all preparation steps for all audios """
+        warnings.warn('prepare_all_audio() was an application-dependent op'
+                      ' for extracting aligned png/audio patches for multimodal'
+                      ' score following.', DeprecationWarning)
         self.render_all_audios()
         self.parse_all_midis()
         self.copy_sheets()
 
     def load_sheet(self):
-        """
-        Load sheet image
+        """Load sheet images of current piece to prepare for OMR
+        and/or coords editing.
         """
         self.status_label.setText("Loading sheet ...")
 
@@ -1350,7 +1364,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         system_net.load(dump_file)
 
         # initialize omr system
-        self.omr = OpticalMusicRecognizer(note_detector=note_net, system_detector=system_net, bar_detector=bar_net)
+        self.omr = OpticalMusicRecognizer(note_detector=note_net,
+                                          system_detector=system_net,
+                                          bar_detector=bar_net)
 
         self.status_label.setText("done!")
 

@@ -110,7 +110,7 @@ def change_midi_file_tempo(input_file, output_file, ratio=1.0):
 
 
 def render_audio(filename_in, sound_font, velocity=None, change_tempo=True, tempo_ratio=None, target_dir=None,
-                 sound_font_root="/Users/hajicj/.fluidsynth"):
+                 sound_font_root="~/.fluidsynth"):
     """
     Render midi to audio
     """
