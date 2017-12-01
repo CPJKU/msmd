@@ -250,7 +250,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # Align written notes and performance onsets
         # [NOT IMPLEMENTED]
-        self.save_bar_coords()
+        self.sort_bar_coords()
         self.sort_note_coords()
 
         self.save_coords()
