@@ -3,237 +3,42 @@ of a piece of music from its encoding, such as a LilyPond or MusicXML file.
 There is an audio view, a sheet music view, a MIDI view, and others may be
 added.
 
-A GUI for manually editing the sheet music view is also provided.
+A GUI for manually editing the sheet music view is started if no command-line
+arguments are given.
 
 Workflow
---------
+========
 
 Each piece of music is represented as a directory. The source encoding file
-(*.ly or *.xml; in this example we assume a LilyPond file is available) is
+(``*.ly`` or ``*.xml``; in this example we assume a LilyPond file is available) is
 directly in that directory::
 
+```
   bach-example-1/
     bach-example-1.ly
+```
 
-The following representations (views) are generated directly from the source
-
-* PDF
-* MIDI
-
+The PDF and MIDI representations (views) are generated directly from the source.
 Additional views are then generated into sub-folders. There is an audio view
 (or views, generated from MIDI using multiple sound-fonts and tempi), an image
 view (one PNG file per page, generated from the PDF), an OMR view (locations
 of relevant symbols and other structured information about the images of the
 score; derived from the image view with the help of some LilyPond PDF tricks),
 and a features (spec) view that represents the music as a feature matrix:
-a spectrogram, an onset map, and a MIDI matrix.::
+a spectrogram, an onset map, and a MIDI matrix.
 
-  bach-example-1/
-    bach-example-1.ly
-    bach-example-1.pdf
-    bach-example-1.midi
-    audio/
-      bach-example-1_tempo-X000_soundfont-A.flac
-      bach-example-1_tempo-Y000_soundfont-B.flac
-    sheet/
-      01.png
-      02.png
-      03.png
-    coords/
-      bars_01.npy
-      bars_02.npy
-      bars_03.npy
-      notes_01.npy
-      notes_02.npy
-      notes_03.npy
-      systems_01.npy
-      systems_02.npy
-      systems_03.npy
-    spec/
-      bach-example-1_tempo-X000_soundfont-A_midi.npy
-      bach-example-1_tempo-X000_soundfont-A_onsets.npy
-      bach-example-1_tempo-X000_soundfont-A_spec.npy
-      bach-example-1_tempo-Y000_soundfont-B_midi.npy
-      bach-example-1_tempo-Y000_soundfont-B_onsets.npy
-      bach-example-1_tempo-Y000_soundfont-B_spec.npy
+Further details are in the documentation.
 
-The Sheet Manager implements the processing pipeline and allows some manual
-editing. The workflow (for a LilyPond input) is:
-
-* Ly --> normalized Ly
-  * normalized Ly --> PDF
-    * PDF --> PNG
-      * PNG --> bar coords
-      * PNG --> system coords
-      * PNG --> note coords (MXML only)
-    * PDF + PNG --> note coords (LilyPond only)
-  * normalized Ly --> MIDI
-    * MIDI --> MIDI matrix
-    * MIDI --> onsets matrix
-    * MIDI --> audio
-      * Audio --> spectrogram
-
-Ly --> normalized Ly
-^^^^^^^^^^^^^^^^^^^^
-
-**Converts LilyPond ``\relative { }`` music to absolute.**
-
-LilyPond encoding is hard to standardize. It is a format for engraving,
-not really for representing the music per se, so the only actual parser
-just outputs PDF or MIDI. There is no working Ly --> MXML conversion,
-MXML --> Ly works barely and with errors, and except for LilyPond itself,
-no program is capable of producing correct MIDI.
-
-The major advantage of LilyPond is that we bypass the need for OMR
-on noteheads, because their locations can be extracted directly from
-the generated PDF. The second major advantage is that we can extract
-the pitch of each notehead directly from the lilypond file, because
-the PDF points to where the notehead was encoded.
-
-However, LilyPond has two ways of encoding pitch: *absolute* and *relative*.
-In absolute encoding, the pitch of a note is indicated absolutely:
-a C2 will always be marked as ``c,``, a D5 as ``d''``, etc., so
-the sequence C4, D4, F#5 would be encoded as ``c' d' fis''``. However,
-relative encoding interprets the pitch and octave with respect to
-the previous pitch, so the sequence ``c' d' fis''`` would mean
-C4, D5, F#6 -- each apostrophe is interpreted as an octave jump. To
-encode C4, D4, F#5 in relative encoding, we would write ``c' d fis'``:
-the apostrophe at ``fis'`` means "one octave above the ``fis`` closest
-to the previous note".
-
-Therefore, in order to be able to interpret the pitch of a notehead
-locally, from a single LilyPond tokend (e.g. ``fis'``), we require
-the absolute encoding. Fortunately, the ``python-ly`` package implements
-conversion to absolute encoding.
-
-
-Normalized Ly --> PDF
-^^^^^^^^^^^^^^^^^^^^^
-
-To render to PDF, we use the command::
-
-  lilypond -o $TARGET_PDF -e"(ly:set-option \'point-and-click \'(note-event))"
-
-The option ensures that the generated PDF contains xref anchors for each
-notehead.
-
-
-PDF --> PNG
-^^^^^^^^^^^
-
-The ``convert`` command is used to generate a PNG file for each page of the
-PDF file::
-
-  convert -density 150 $PDF_PATH -quality 90
-
-The PNG files are resized to a pre-configured ``target_width`` (by default,
-835 pixels) and saved into the ``sheet/`` subdirectory.
-
-.. note::
-
-  Sheet Manager can deal with pages of different aspect ratios in
-  one PDF; just note that the constant width means landscape pages
-  will be shrunk a lot.
-
-PDF + PNG --> note coords.
-^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Using the LilyPond-generated xrefs in the PDF file, we can extract locations
-of the noteheads from the PDF. The module ``sheet_manager.pdf_parser``
-implements this functionality, using the ``pdfminer`` package for parsing
-the PDF. The note coordinates are extracted for each page separately
-and stored as a ``*.npy`` file in the ``coords/`` subdirectory.
-
-The data format is an array of shape ``(n_noteheads, 2)``, where the first
-column contains the row and the second column the centroid of the given
-notehead with respect to the corresponding PNG of the given page.
-This re-scaling of the note coords is why we need to first generate the
-per-page PNG.
-
-
-PNG --> system/bar/note coords.
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Automated detectiion staff systems, barlines, and noteheads from the image
-view is provided using lightweight optical music recognition (OMR).
-(If you are using LilyPond input, you don't really need
-the notehead model, but you still need to detect staff systems and
-barlines.)
-Pre-trained models are provided. They are U-Nets, implemented
-in Lasagne/theano, which means that you need to set up this stack if
-you want to use OMR.
-
-You can edit the coordinates manually in a GUI editor (and you have
-to check for correctness through the GUI anyway).
-
-The coordinates of the symbols are stored per page into the ``coords/``
-subdirectory, as ``systems_01.npy, systems_02.npy, bars_01.npy,``
-``bars_02.npy, notes_01.npy, notes_02.npy``, etc.
-
-Normalized Ly --> MIDI
-^^^^^^^^^^^^^^^^^^^^^^
-
-MIDI is exported automatically during LilyPond file typesetting, based
-on the ``\midi { }`` directive in the normalized ``*.ly`` source file.
-By default, if the default MIDI file is already available, it is *not*
-overwritten: this is done by suppressing the MIDI output with option::
-
-  -e"(set! write-performances-midis (lambda (performances basename . rest) 0))"
-
-
-MIDI --> audio (+performance MIDI)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-From the MIDI file, we generate audio with ``fluidsynth``, a list
-of pre-configured soundfonts, and a list of pre-configured tempo
-settings::
-
-  fluidsynth -F $AUDIO_FILE -O s16 -T flac $SOUNDFONT $PERFORMANCE_MIDI
-
-Since the audio may be generated with a range of tempos (and possibly
-other MIDI processing operations), the ``$PERFORMANCE_MIDI`` file is created
-in the ``audio/`` subdirectory first, from which the audio is generated.
-
-Audio --> spectrogram
-^^^^^^^^^^^^^^^^^^^^^
-
-The spectrogram of each audio is created, using the ``madmom`` library.
-Signal processing configuration consists of a sample rate (default:
-22050), frame size (default: 2048), frames per second (FPS, default: 20),
-no. of frequency bands (default: 16), and frequency range (default: 30--6000).
-The spectrum is computed with a logarithmic filter bank. The spectrogram
-is saved into the ``spec/`` subdirectory; one for each performance
-(soundfont + tempo combination; see audio rendering).
-
-This functionality is implemented in the ``sheet_manager.midi_parser``
-module.
-
-
-Performance MIDI --> MIDI matrix, onsets
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-The MIDI matrix is generated frame-wise with the pre-configured frame rate
-(``FPS``), matching the spectrogram generation frame rate. The onsets
-are a list, with the ``i``-th item corresponding to the frame at which
-the ``i``-th ``note-on`` MIDI event happens.
-Both features are saved into the ``spec/`` subdirectory; one MIDI matrix
-and onset list for each soundfont and tempo ratio (see above).
-
-This functionality is implemented in the ``sheet_manager.midi_parser``
-module.
-
-
-Supported source encodings
---------------------------
-
-* LilyPond
-* MusicXML (relies heavily on OMR & needs a lot of manual annotation)
-
+The ``sheet_manager.py`` can be called either for batch processing as a script,
+or a GUI for manually validating the annotations, especially alignment between
+noteheads and onsets.
 """
 from __future__ import print_function
 
 import argparse
+import logging
 
+import time
 from PyQt4 import QtCore, QtGui, Qt, uic
 
 import os
@@ -242,6 +47,9 @@ import cv2
 import glob
 import shutil
 import pickle
+import sys
+import warnings
+
 import numpy as np
 
 # set backend to qt
@@ -276,9 +84,14 @@ tempo_ratios = [1.0]
 sound_fonts = ["Steinway"]
 
 
+class SheetManagerError(Exception):
+    pass
+
+
 class SheetManager(QtGui.QMainWindow, form_class):
-    """
-    Gui for managing annotated sheet music
+    """Processing and GUI for the Multi-Modal MIR dataset.
+
+    The workflow is wrapped in the ``process_piece()`` method.
     """
 
     def __init__(self, parent=None):
@@ -372,12 +185,85 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.midi_matrix = None
 
     def open_sheet(self):
-        """
-        Open entire folder
+        """Choose a piece directory to open through a dialog window.
         """
 
         # piece root folder
-        self.folder_name = str(QtGui.QFileDialog.getExistingDirectory(self, "Select Sheet Music", "."))
+        folder_name = str(QtGui.QFileDialog.getExistingDirectory(
+            self,
+            "Select Sheet Music",
+            "."))
+        self.load_piece(folder_name=folder_name)
+
+    def process_piece(self, piece_folder, workflow="ly"):
+        """Process the entire piece, using the specified workflow.
+
+        :param piece_folder: The path of the requested piece folder.
+            If the piece folder is not found, raises a ``SheetManagerError``.
+
+        :param workflow: Which workflow to use, based on the available encoding
+            of the piece. By default, uses ``"ly"``, the LilyPond workflow.
+            (Currently, only the LilyPond workflow is implemented.)
+        """
+        if not os.path.isdir(piece_folder):
+            raise SheetManagerError('Piece folder not found: {0}'
+                                    ''.format(piece_folder))
+
+        is_workflow_ly = (workflow == "ly") or (workflow == "Ly")
+        if not is_workflow_ly:
+            raise SheetManagerError('Only the LilyPond workflow is currently '
+                                    ' supported!'
+                                    ' Use arguments workflow="ly" or "Ly". '
+                                    ' (Got: workflow="{0}")'.format(workflow))
+
+        self.load_piece(piece_folder)
+
+        if is_workflow_ly and not self.lily_file:
+            raise SheetManagerError('Piece does not have LilyPond source'
+                                    ' available; cannot process with workflow={0}'
+                                    ''.format(workflow))
+
+        # Load
+        self.ly2pdf_and_midi()
+        self.pdf2img()
+
+        # Exploiting LilyPond point-and-click PDF annotations to get noteheads
+        if is_workflow_ly:
+            self.pdf2coords()
+
+        # Audio
+        self.render_audio()
+        self.parse_midi()
+        self.load_spectrogram()
+
+        # OMR
+        self.load_sheet()
+
+        if not self.omr:
+            self.init_omr()
+        self.detect_systems()
+        self.detect_bars()
+
+        # If we are unlucky and have no LilyPond source:
+        if not is_workflow_ly:
+            self.detect_note_heads()
+
+        # Align written notes and performance onsets
+        # [NOT IMPLEMENTED]
+        self.save_bar_coords()
+        self.sort_note_coords()
+
+        self.save_coords()
+
+    def load_piece(self, folder_name):
+        """Given a piece folder, set the current state of SheetManager to this piece.
+        If the folder does not exist, does nothing."""
+        if not os.path.isdir(folder_name):
+            print('Loading piece from folder {0} failed: folder does not exist!'
+                  ''.format(folder_name))
+            return
+
+        self.folder_name = folder_name
 
         # name of piece
         self.piece_name = os.path.basename(self.folder_name)
@@ -632,8 +518,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def render_all_audios(self):
         """
-        Render audio from midi
+        Render audio from midi for all pieces.
         """
+        warnings.warn('Will be replaced by batch processing.',
+                      DeprecationWarning)
+
         self.status_label.setText("Rendering audios ...")
         from render_audio import render_audio
 
@@ -667,7 +556,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def parse_midi(self):
         """
-        Parse midi file
+        Parse all performance midi files and create the corresponding
+        feature files.
         """
         from midi_parser import MidiParser
 
@@ -731,8 +621,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def parse_all_midis(self):
         """
-        Parse midi file
+        Parse midi file for all pieces.
         """
+        warnings.warn('Will be replaced by batch processing.',
+                      DeprecationWarning)
 
         self.status_label.setText("Parsing midis ...")
 
@@ -821,7 +713,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         sheet_dir = os.path.join(self.folder_name, self.sheet_folder)
         img_files = np.sort(glob.glob(sheet_dir + "/*.*"))
 
-        # load data
+        # initialize page data (currently loads just empty coords)
         n_pages = len(img_files)
         for i in xrange(n_pages):
             self.sheet_pages.append(cv2.imread(img_files[i], 0))
@@ -832,9 +724,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.page_bars.append(np.zeros((0, 2, 2)))
 
         self.spinBox_page.setMaximum(n_pages - 1)
-        
+
         self.update_sheet_statistics()
-        
+
+        # Loads the coordinates, if there are any stored
+        self.load_coords()
+
         self.status_label.setText("done!")
 
     def load_coords(self):
@@ -1423,7 +1318,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def init_omr(self):
         """ Initialize omr module """
-
+        print('Initializing omr ...')
         self.status_label.setText("Initializing omr ...")
 
         # select model
@@ -1434,19 +1329,22 @@ class SheetManager(QtGui.QMainWindow, form_class):
         from omr.omr_app import OpticalMusicRecognizer
 
         # initialize note detection neural network
-        dump_file = "omr_models/note_params.pkl"
+        dump_file = os.path.join(os.path.dirname(__file__),
+                                 "omr_models/note_params.pkl")
         net = note_model.build_model()
         note_net = SegmentationNetwork(net, print_architecture=False)
         note_net.load(dump_file)
 
         # initialize bar detection neural network
-        dump_file = "omr_models/bar_params.pkl"
+        dump_file = os.path.join(os.path.dirname(__file__),
+                                 "omr_models/bar_params.pkl")
         net = bar_model.build_model()
         bar_net = SegmentationNetwork(net, print_architecture=False)
         bar_net.load(dump_file)
 
         # initialize system detection neural network
-        dump_file = "omr_models/system_params.pkl"
+        dump_file = os.path.join(os.path.dirname(__file__),
+                                 "omr_models/system_params.pkl")
         net = system_model.build_model()
         system_net = SegmentationNetwork(net, print_architecture=False)
         system_net.load(dump_file)
@@ -1460,6 +1358,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """ Detect note heads in current image """
         from omr.utils.data import prepare_image
 
+        print('Detecting note heads ...')
         self.status_label.setText("Detecting note heads ...")
 
         if self.omr is None:
@@ -1478,7 +1377,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # update sheet statistics
         self.update_sheet_statistics()
 
-        self.plot_sheet()
+        # refresh view, if in interactive mode.
+        if self.fig is not None:
+            self.plot_sheet()
 
         self.status_label.setText("done!")
 
@@ -1486,6 +1387,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """ Detect bars in current image """
         from omr.utils.data import prepare_image
 
+        print('Detecting bars ...')
         self.status_label.setText("Detecting bars ...")
 
         if self.omr is None:
@@ -1504,8 +1406,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # update sheet statistics
         self.update_sheet_statistics()
 
-        # refresh view
-        self.plot_sheet()
+        # refresh view, if in interactive mode.
+        if self.fig is not None:
+            self.plot_sheet()
 
         self.status_label.setText("done!")
 
@@ -1513,6 +1416,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """ Detect systems in current image """
         from omr.utils.data import prepare_image
 
+        print('Detecting systems ...')
         self.status_label.setText("Detecting systems ...")
 
         if self.omr is None:
@@ -1531,18 +1435,39 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # update sheet statistics
         self.update_sheet_statistics()
 
-        # refresh view
-        self.plot_sheet()
+        # refresh view, if in interactive mode.
+        if self.fig is not None:
+            self.plot_sheet()
 
         self.status_label.setText("done!")
 
-##############################################################################
 
+##############################################################################
 
 
 def build_argument_parser():
     parser = argparse.ArgumentParser(description=__doc__, add_help=True,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
+
+    parser.add_argument('-d', '--data_dir', default=None,
+                        help='[CLI] This is the root data directory. The piece'
+                             ' dirs should be directly in this one. If running'
+                             ' Sheet Manager in batch mode, this argument is'
+                             ' required; if it is not give, GUI is launched.')
+    parser.add_argument('-p', '--pieces', nargs='+',
+                        help='[CLI] The pieces which should be processed. ')
+    parser.add_argument('-a', '--all', action='store_true',
+                        help='[CLI] Process all the pieces in the data_dir.'
+                             ' Equivalent to -p `ls $DATA_DIR`.')
+    parser.add_argument('-c', '--config',
+                        help='Load configuration from this file.')
+    parser.add_argument('-f', '--force',
+                        help='Forces overwrite of existing data.'
+                             ' [NOT IMPLEMENTED]')
+    parser.add_argument('--ignore_errors', action='store_true',
+                        help='If set, will not stop when the Sheet Manager'
+                             ' raises an error. Instead, it will simply skip'
+                             ' over the piece that raised the error.')
 
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Turn on INFO messages.')
@@ -1552,10 +1477,84 @@ def build_argument_parser():
     return parser
 
 
-if __name__ == "__main__":
-    """ main """
-    import sys
+def launch_gui():
+    """Launches the GUI."""
+    if args.verbose:
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    if args.debug:
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
+
     app = QtGui.QApplication(sys.argv)
     myWindow = SheetManager()
     myWindow.show()
     app.exec_()
+
+
+def run_batch_mode(args):
+    """Runs SheetManager in batch mode."""
+    data_dir = args.data_dir
+    if not os.path.isdir(data_dir):
+        raise OSError('Requested data dir does not exist: {0}'
+                      ''.format(data_dir))
+    logging.info('Processing data dir: {0}'.format(data_dir))
+
+    pieces = args.pieces
+    if args.all:
+        pieces = os.listdir(data_dir)
+
+    piece_dirs = []
+    for p in pieces:
+        piece_dir = os.path.join(data_dir, p)
+        if not os.path.isdir(piece_dir):
+            raise OSError('Piece does not exist: {0}'.format(piece_dir))
+        piece_dirs.append(piece_dir)
+    logging.info('Processing pieces:\n{0}'.format('\t'.join(pieces)))
+
+    config_file = args.config
+    if config_file and not os.path.isfile(config_file):
+        raise OSError('Config file does not exist: {0}'.format(config_file))
+
+    # We need to initialize the app to give PyQT all the context it expects
+    app = QtGui.QApplication(sys.argv)
+    mgr = SheetManager()
+    # Does not do mgr.show()!
+    # app.exec_()
+
+    _start_time = time.clock()
+    _last_time = time.clock()
+    for i, (piece, piece_dir) in enumerate(zip(pieces, piece_dirs)):
+        print('[{0}/{1}]\tProcessing piece: {2}'.format(i, len(pieces), piece))
+
+        try:
+            mgr.process_piece(piece_dir, workflow="ly")
+        except SheetManagerError as mgre:
+            print('SheetManagerError: {0}'.format(mgre.message))
+
+        _now = time.clock()
+        print('... {0:.2f} s (Total time expired: {1:.2f} s)'
+              ''.format(_now - _last_time, _now - _start_time))
+        _last_time = _now
+
+    print('Processing finished!')
+
+
+def _requested_interactive(args):
+    return args.data_dir is None
+
+
+def main(args):
+
+    if _requested_interactive(args):
+        launch_gui()
+
+    else:
+        run_batch_mode(args)
+
+##############################################################################
+
+
+if __name__ == '__main__':
+    parser = build_argument_parser()
+    args = parser.parse_args()
+
+    main(args)
