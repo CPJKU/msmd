@@ -2,6 +2,7 @@
 and their documentation. Use it to seed other configuration files."""
 import numpy
 
+
 # PDF --> PNG rendering
 # ---------------------
 
