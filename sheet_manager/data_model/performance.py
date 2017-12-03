@@ -44,6 +44,8 @@ class Performance(object):
 
         self.metadata = self.load_metadata()
 
+        if audio_fmt.startswith('.'):
+            audio_fmt = audio_fmt[1:]
         self.audio_fmt = audio_fmt
 
         self.audio = self.discover_audio()
@@ -69,7 +71,18 @@ class Performance(object):
         the suffix naming conventions: if you save computed features
         to the performance using this method, you are guaranteed
         to be able to find them later using the ``_load_feature_by_suffix()``
-        method."""
+        method.
+
+        :param suffix: The distinguishing of the feature, e.g. ``midi``
+            for the MIDI matrix feature, or ``spec`` for the spectrogram.
+            Do not supply the separator; the method takes care of using
+            the appropriate separator to incorporate the suffix into the
+            filename.
+
+            The file format also needs to be given. Currently, Performances
+            expect features to be numpy arrays, so the suffix should end
+            with ``.npy``.
+        """
         if not suffix.endswith('.npy'):
             logging.warn('Adding a feature with an unexpected suffix: {0}'
                          ''.format(suffix))
@@ -77,6 +90,10 @@ class Performance(object):
         if not isinstance(feature, numpy.ndarray):
             raise TypeError('Features must be numpy arrays! Got feature'
                             ' of type: {0}'.format(type(feature)))
+
+        # Normalizing the suffix
+        while suffix.startswith(self.AUDIO_NAMING_SEPARATOR):
+            suffix = suffix[1:]
         feature_name = self.AUDIO_NAMING_SEPARATOR.join([self.audio_name,
                                                          suffix])
         if feature_name in self.features:

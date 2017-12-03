@@ -6,9 +6,9 @@ from setuptools import setup
 setup(
     name='sheet_manager',
     version='0.1',
-    packages=['',
-              'sheet_manager',
-              'sheet_manager.gui'],
+    packages=['sheet_manager',
+              'sheet_manager.gui',
+              'sheet_manager.data_model'],
     include_package_data=True,
     url='',
     license='(c) All rights reserved.',

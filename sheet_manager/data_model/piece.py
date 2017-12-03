@@ -4,11 +4,15 @@ from __future__ import print_function
 
 import logging
 import os
+import shutil
 
+import sys
+
+import time
 import yaml
 
 from sheet_manager.data_model.performance import Performance
-from util import SheetManagerDBError
+from sheet_manager.data_model.util import SheetManagerDBError
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
@@ -121,6 +125,7 @@ class Piece(object):
             os.mkdir(self.score_dir)
 
     def load_score(self, score_name):
+        self.update()
         raise NotImplementedError()
 
     def load_all_scores(self, score_name):
@@ -129,6 +134,7 @@ class Piece(object):
     def load_performance(self, performance_name):
         """Creates a ``Performance`` object for the given performance
         and returns it."""
+        self.update()
         if performance_name not in self.performances:
             raise SheetManagerDBError('Piece {0} in collection {1} does'
                                       ' not have a performance with name {2}.'
@@ -229,3 +235,70 @@ class Piece(object):
             metadata = yaml.load_all(hdl)
 
         return metadata
+
+    def clear_performances(self):
+        """Remove all performances. Use this carefully!"""
+        for p in self.performances:
+            self.remove_performance(p)
+
+    def remove_performance(self, name):
+        """Removes the given performance."""
+        self.update()
+        if name not in self.performances:
+            logging.warn('Piece {0}: trying to remove performance {1},'
+                         ' but it does not exist!'.format(self.name, name))
+            return
+
+        shutil.rmtree(self.performances[name])
+        self.update()
+
+    def add_performance(self, name, audio_file, midi_file=None,
+                        overwrite=False):
+        """Creates a new performance in the piece from existing audio
+        and optionally MIDI files.
+
+        :param name: Name of the new performance. The performance folder
+            will have this name, and the performance audio (and midi) file
+            names will be derived from this name by simply copying the format
+            suffix from the ``audio_file`` and ``midi_file`` arguments.
+
+        :param audio_file: The audio file for the performance. Will be copied
+            into the newly created performance directory, with the filename
+            derived as the `name`` plus the format suffix. Required.
+
+        :param midi_file: The performance MIDI. Optional. Will be copied
+            into the newly created performance directory. Same name convention
+            as for ``audio_file``.
+
+        :param overwrite: If true, if a performance with the given ``name``
+            exists, will delete it.
+        """
+        if name in self.performances:
+            if overwrite:
+                logging.warning('Piece {0}: performance {1} already exists,'
+                                ' overwriting!'.format(self.name, name))
+                time.sleep(5)
+                self.remove_performance(name)
+            else:
+                raise SheetManagerDBError('Piece {0}: performance {1} already'
+                                          ' exists!'.format(self.name, name))
+        new_performance_dir = os.path.join(self.performance_dir, name)
+
+        # This part should be refactored as performance.build_performance()
+        os.mkdir(new_performance_dir)
+
+        audio_fmt = os.path.splitext(audio_file)[-1]
+        perf_audio_filename = os.path.join(new_performance_dir,
+                                           name + audio_fmt)
+        shutil.copyfile(audio_file, perf_audio_filename)
+
+        if midi_file:
+            midi_fmt = os.path.splitext(midi_file)[-1]
+            perf_midi_filename = os.path.join(new_performance_dir,
+                                              name + midi_fmt)
+            shutil.copyfile(midi_file, perf_midi_filename)
+
+        self.update()
+
+        # Test-load the Performance. Ensures folder structure initialization.
+        _ = self.load_performance(name)

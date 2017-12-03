@@ -54,6 +54,9 @@ import numpy as np
 
 # set backend to qt
 import matplotlib
+
+from sheet_manager.data_model.piece import Piece
+
 matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
@@ -81,7 +84,7 @@ sound_fonts = ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]  # ["Acoust
 # todo: remove this
 PIECES = BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES
 tempo_ratios = [1.0]
-sound_fonts = ["Steinway"]
+sound_fonts = ["FluidR3_GM"]
 
 
 class SheetManagerError(Exception):
@@ -129,7 +132,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.pushButton_loadSpectrogram.clicked.connect(self.load_spectrogram)
         self.pushButton_renderAudio.clicked.connect(self.render_audio)
         self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
-        self.pushButton_parseMidi.clicked.connect(self.parse_midi)
+        self.pushButton_extractPerformanceFeatures.clicked.connect(
+            self.extract_performance_features)
         self.pushButton_parseAllMidis.clicked.connect(self.parse_all_midis)
         self.pushButton_copySheets.clicked.connect(self.copy_sheets)
         self.pushButton_prepareAll.clicked.connect(self.prepare_all_audio)
@@ -151,6 +155,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         if not os.path.exists("tmp"):
             os.mkdir("tmp")
+
+        self.piece = None
 
         self.lily_file = None
         self.mxml_file = None
@@ -236,7 +242,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # Audio
         self.render_audio()
-        self.parse_midi()
+        self.extract_performance_features()
         self.load_spectrogram()
 
         # OMR
@@ -265,11 +271,22 @@ class SheetManager(QtGui.QMainWindow, form_class):
             print('Loading piece from folder {0} failed: folder does not exist!'
                   ''.format(folder_name))
             return
-
+        # Normalize
+        folder_name = os.path.normpath(folder_name)
         self.folder_name = folder_name
 
-        # name of piece
-        self.piece_name = os.path.basename(self.folder_name)
+        # Create the current Piece
+        piece_name = os.path.basename(self.folder_name)
+        collection_root = os.path.split(self.folder_name)[0]
+        workflow = 'ly'
+
+        piece = Piece(name=piece_name,
+                      root=collection_root,
+                      authority_format=workflow)
+        self.piece = piece
+
+        # Old workflow.
+        self.piece_name = piece_name
 
         # selected sheet version
         self.sheet_version = self.spinBox_sheetVersion.value()
@@ -352,7 +369,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.lineEdit_pdf.setText(self.pdf_file)
         else:
             print('Warning: LilyPond did not generate PDF file.')
-            return
 
         # Check if the MIDI file was actually created.
         output_midi_file = os.path.join(self.folder_name, self.piece_name) + '.mid'
@@ -364,6 +380,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 return
         self.midi_file = output_midi_file
         self.lineEdit_midi.setText(self.midi_file)
+
+        # Update with the MIDI encoding
+        self.piece.update()
 
     def normalize_ly(self):
         """ Converts lilypond file to absolute. There is a sanity check:
@@ -514,14 +533,35 @@ class SheetManager(QtGui.QMainWindow, form_class):
         os.system("cp tmp/tmp.midi %s" % self.midi_file)
         self.lineEdit_midi.setText(self.midi_file)
 
-    def render_audio(self):
+    def render_audio(self, performance_prefix=""):
         """
-        Render audio from midi
+        Render audio from midi.
         """
         self.status_label.setText("Rendering audio ...")
+
+        if 'midi' not in self.piece.encodings:
+            raise SheetManagerError('Cannot render audio from current piece:'
+                                    ' no MIDI encoding available!')
+
         from render_audio import render_audio
+
+        if not performance_prefix:
+            performance_prefix = self.piece.name
+
         for ratio in tempo_ratios:
-            render_audio(self.midi_file, sound_font="FluidR3_GM", tempo_ratio=ratio, velocity=None)
+            for sound_font in sound_fonts:
+                performance_name = performance_prefix \
+                                   + '_tempo-{0}'.format(int(1000 * ratio)) \
+                                   + '_{0}'.format(sound_font)
+                audio_file, perf_midi_file = render_audio(
+                    self.piece.encodings['midi'],
+                    sound_font=sound_font,
+                    tempo_ratio=ratio, velocity=None)
+                self.piece.add_performance(name=performance_name,
+                                           audio_file=audio_file,
+                                           midi_file=perf_midi_file,
+                                           overwrite=True)
+
         self.status_label.setText("done!")
 
     def render_all_audios(self):
@@ -562,45 +602,85 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("done!")
         print("done!")
 
-    def parse_midi(self):
+    def extract_performance_features(self):
         """
         Parse all performance midi files and create the corresponding
-        feature files.
+        feature files: spectrogram, MIDI matrix, and onsets. Assumes both
+        the performance MIDI and the audio file are available; if performance
+        MIDI is not available, skips the performance. (This is behavior that
+        needs to be changed with refactoring the MIDI parser to take care
+        of the spectrogram separately from the MIDI-based features, in order
+        to have any useful runtime feature extraction for performance test
+        data!)
         """
         from midi_parser import MidiParser
 
-        self.status_label.setText("Parsing midi ...")
-        
-        pattern = self.folder_name + "/audio/*.mid*"
-        for midi_file_path in glob.glob(pattern):
-            print("Processing", midi_file_path)
+        self.status_label.setText("Parsing performance midi files and audios...")
 
-            # get file names and directories
-            directory = os.path.dirname(midi_file_path)
-            file_name = os.path.basename(midi_file_path).split('.')[0]
-            audio_file_path = os.path.join(directory, file_name + '.flac')
-            spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
-            onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
-            midi_matrix_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_midi.npy')
+        # For each performance:
+        #  - load performance MIDI
+        #  - compute onsets
+        #  - compute MIDI matrix
+        #  - save onsets as perf. feature
+        #  - save MIDI matrix as perf.feature
+        #  - load performance audio
+        #  - compute performance spectrogram
+        #  = save spectrogram as perf. feature
+        for performance in self.piece.load_all_performances():
+            audio_file_path = performance.audio
+            midi_file_path = performance.midi
+            if not os.path.isfile(midi_file_path):
+                logging.warn('Performance {0} has no MIDI file, cannot'
+                             ' compute onsets and MIDI matrix. Skipping.'
+                             ''.format(performance.name))
+                continue
 
-            # check if to compute spectrogram
-            if not self.checkBox_computeSpec.isChecked():
-                audio_file_path = None
-                self.spec = np.load(spec_file_path)
-            
-            # parse midi file
             midi_parser = MidiParser(show=self.checkBox_showSpec.isChecked())
-            Spec, self.onsets, self.midi_matrix = midi_parser.process(midi_file_path, audio_file_path,
-                                                                      return_midi_matrix=True)
+            spectrogram, onsets, midi_matrix = midi_parser.process(
+                midi_file_path,
+                audio_file_path,
+                return_midi_matrix=True)
 
-            # save data
-            if self.checkBox_computeSpec.isChecked():
-                self.spec = Spec
-                np.save(spec_file_path, self.spec)
-                np.save(midi_matrix_file_path, self.midi_matrix)
+            performance.add_feature(spectrogram, 'spec.npy', overwrite=True)
+            performance.add_feature(onsets, 'onsets.npy', overwrite=True)
+            performance.add_feature(midi_matrix, 'midi.npy', overwrite=True)
 
-            np.save(onset_file_path, self.onsets)
-        
+            self.onsets = onsets
+            self.midi_matrix = midi_matrix
+            self.spec = spectrogram
+        #
+        # pattern = self.folder_name + "/audio/*.mid*"
+        # for midi_file_path in glob.glob(pattern):
+        #     print("Processing", midi_file_path)
+        #
+        #     # get file names and directories
+        #     directory = os.path.dirname(midi_file_path)
+        #     file_name = os.path.basename(midi_file_path).split('.')[0]
+        #     audio_file_path = os.path.join(directory, file_name + '.flac')
+        #     spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
+        #     onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
+        #     midi_matrix_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_midi.npy')
+        #
+        #     # check if to compute spectrogram
+        #     if not self.checkBox_computeSpec.isChecked():
+        #         audio_file_path = None
+        #         self.spec = np.load(spec_file_path)
+        #
+        #     # parse midi file
+        #     midi_parser = MidiParser(show=self.checkBox_showSpec.isChecked())
+        #     Spec, self.onsets, self.midi_matrix = midi_parser.process(midi_file_path,
+        #                                                               audio_file_path,
+        #                                                               return_midi_matrix=True)
+        #
+        #     # save data
+        #     if self.checkBox_computeSpec.isChecked():
+        #         self.spec = Spec
+        #         np.save(spec_file_path, self.spec)
+        #         np.save(midi_matrix_file_path, self.midi_matrix)
+        #
+        #     np.save(onset_file_path, self.onsets)
+        #
+
         # set number of onsets in gui
         self.lineEdit_nOnsets.setText(str(len(self.onsets)))
         

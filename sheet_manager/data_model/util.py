@@ -6,10 +6,12 @@ import os
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
 
+
 class SheetManagerDBError(OSError):
     pass
 
-def path2name(self, path):
+
+def path2name(path):
     path, name = os.path.split(path)
     while not name:
         path, name = os.path.split(path)

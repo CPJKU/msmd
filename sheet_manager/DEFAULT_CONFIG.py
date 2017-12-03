@@ -6,6 +6,9 @@ import numpy
 # PDF --> PNG rendering
 # ---------------------
 
+TARGET_WIDTH = 835
+#: Width of the rendered PNG pages in pixels
+
 PNG_DENSITY = 150
 #: Resolution in DPI of the output PNG
 

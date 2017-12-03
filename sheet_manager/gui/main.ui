@@ -228,9 +228,9 @@
          </widget>
         </item>
         <item row="5" column="0">
-         <widget class="QPushButton" name="pushButton_parseMidi">
+         <widget class="QPushButton" name="pushButton_extractPerformanceFeatures">
           <property name="text">
-           <string>Parse MIDIs</string>
+           <string>Extract perf. features</string>
           </property>
          </widget>
         </item>

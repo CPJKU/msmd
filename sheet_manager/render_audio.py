@@ -109,22 +109,29 @@ def change_midi_file_tempo(input_file, output_file, ratio=1.0):
     outfile.save(output_file)
 
 
-def render_audio(filename_in, sound_font, velocity=None, change_tempo=True, tempo_ratio=None, target_dir=None,
+def render_audio(input_midi_path, sound_font,
+                 velocity=None,
+                 change_tempo=True, tempo_ratio=None,
+                 target_dir=None,
+                 audio_fmt=".flac",
                  sound_font_root="~/.fluidsynth"):
     """
-    Render midi to audio
+    Render midi to audio.
+
+    Returns the output audio and midi filenames.
     """
     # path to sound font
     sound_font_path = os.path.join(sound_font_root, "%s.sf2" % sound_font)
 
     # get file names and directories
-    file_name = os.path.basename(filename_in)
-    directory = target_dir if target_dir else os.path.dirname(filename_in)
+    file_name = os.path.basename(input_midi_path)
+    directory = target_dir if target_dir else os.path.dirname(input_midi_path)
     audio_directory = os.path.join(directory, 'audio')
     if not os.path.exists(audio_directory):
         os.mkdir(audio_directory)
 
-    new_file_name, midi_extention = file_name.split('.')
+    # Generate the output filename base string
+    new_file_name, midi_extension = os.path.splitext(file_name)
 
     if tempo_ratio:
         new_file_name += "_temp_%d" % int(1000 * tempo_ratio)
@@ -135,13 +142,17 @@ def render_audio(filename_in, sound_font, velocity=None, change_tempo=True, temp
     new_file_name += "_%s" % sound_font
 
     # set file names
-    output_format_suffix = ".flac"
-    audio_file = os.path.join(audio_directory, new_file_name + output_format_suffix)
-    filename_out = os.path.join(audio_directory, new_file_name + "." + midi_extention)
+    if audio_fmt.startswith("."):
+        audio_fmt = audio_fmt[1:]
+    audio_fname = new_file_name + "." + audio_fmt
+    audio_path = os.path.join(audio_directory, audio_fname)
+
+    perf_midi_fname = new_file_name + "." + midi_extension
+    perf_midi_path = os.path.join(audio_directory, perf_midi_fname)
 
     # prepare midi
     if change_tempo:
-        change_midi_file_tempo(filename_in, filename_out, tempo_ratio)
+        change_midi_file_tempo(input_midi_path, perf_midi_path, tempo_ratio)
 
     # try:
     #     from midi2audio import FluidSynth
@@ -149,8 +160,15 @@ def render_audio(filename_in, sound_font, velocity=None, change_tempo=True, temp
     #     fs.midi_to_audio(filename_out, audio_file=audio_file)
     # except ImportError:
     # synthesize midi file to audio
-    cmd = "fluidsynth -F %s -O s16 -T flac %s %s" % (audio_file, sound_font_path, filename_out)
+    cmd = "fluidsynth -F %s -O s16 -T flac %s %s" % (audio_path,
+                                                     sound_font_path,
+                                                     perf_midi_path)
     os.system(cmd)
+
+    return audio_path, perf_midi_path
+
+
+##############################################################################
 
 
 if __name__ == '__main__':
