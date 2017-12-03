@@ -1653,6 +1653,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # convert systems to rois
         self.systems_to_rois()
 
+        # Update coords
+        self.sort_bar_coords()
+        self.sort_note_coords()
+
         # update sheet statistics
         self.update_sheet_statistics()
 
