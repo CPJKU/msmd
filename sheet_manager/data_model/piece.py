@@ -7,6 +7,7 @@ import os
 
 import yaml
 
+from sheet_manager.data_model.performance import Performance
 from util import SheetManagerDBError
 
 __version__ = "0.0.1"
@@ -126,10 +127,23 @@ class Piece(object):
         raise NotImplementedError()
 
     def load_performance(self, performance_name):
-        raise NotImplementedError()
+        """Creates a ``Performance`` object for the given performance
+        and returns it."""
+        if performance_name not in self.performances:
+            raise SheetManagerDBError('Piece {0} in collection {1} does'
+                                      ' not have a performance with name {2}.'
+                                      ' Available performances: {3}'
+                                      ''.format(self.name, self.collection_root,
+                                                performance_name,
+                                                self.performances.keys()))
+        performance_dir = self.performances[performance_name]
+        performance = Performance(dir=performance_dir,
+                                  piece_name=self.name)
+        return performance
 
-    def load_all_performances(self, performance_name):
-        raise NotImplementedError()
+    def load_all_performances(self):
+        """Returns a list of all the available Performances."""
+        return [self.load_performance(p) for p in self.performances]
 
     def update(self):
         """Refreshes the index of available performances
