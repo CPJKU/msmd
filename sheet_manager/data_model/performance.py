@@ -18,27 +18,30 @@ class Performance(object):
     """The Performance class represents one performance of a piece
     (live or synthetic). Each performance has:
 
-    * audio
+    * audio (this is the authority file for a performance)
     * midi (technically not necessary, but esp. in performances synthesized
-      by Sheet Manager, it will always be there)
-    * features
+      by Sheet Manager, it will always be there. If it is there, it also
+      acts as an authority for MIDI-based features, since extracting MIDI
+      from an audio is a really hard problem...)
+    * features (various numpy arrays in the features/ subdirectory
+      of the performance directory).
     """
     DEFAULT_META_FNAME = 'meta.yml'
     # AUDIO_EXTENSIONS = ['flac', 'wav', 'mp3', 'ogg']
     AUDIO_NAMING_SEPARATOR = '_'
 
-    def __init__(self, dir, piece_name, audio_fmt='flac'):
+    def __init__(self, folder, piece_name, audio_fmt='flac'):
         """Initialize Performance.
 
         :param audio_fmt: The audio of the performance is expected
             to have this format.
         """
-        if not os.path.isdir(dir):
+        if not os.path.isdir(folder):
             raise SheetManagerDBError('Performance initialized with'
                                       ' non-existent directory: {0}'
-                                      ''.format(dir))
-        self.folder = dir
-        name = path2name(dir)
+                                      ''.format(folder))
+        self.folder = folder
+        name = path2name(folder)
         self.name = name
         self.piece_name = piece_name
 
@@ -54,6 +57,7 @@ class Performance(object):
 
         self.features_dir = os.path.join(self.folder, 'features')
         self._ensure_features_dir()
+
         self.features = self.collect_features()
 
     def update(self):
@@ -116,7 +120,8 @@ class Performance(object):
         file. The keys of the dict are filenames, the values are paths.
         """
         features = {f: os.path.join(self.features_dir, f)
-                    for f in os.listdir(self.features_dir)}
+                    for f in os.listdir(self.features_dir)
+                    if not f.startswith('.')}
         return features
 
     def _ensure_features_dir(self):
@@ -218,8 +223,9 @@ class Performance(object):
     def _load_feature_by_suffix(self, suffix):
         """Utility function for loading features by suffix naming
         conventions."""
+        self.update_features()
         candidate_feature_names = [f for f in self.features
-                             if f.endswith(suffix)]
+                                   if f.endswith(suffix)]
         if len(candidate_feature_names) == 0:
             raise SheetManagerDBError('Performance {0}: Feature {1}'
                                       ' not available! Availble feature'

@@ -56,6 +56,7 @@ import numpy as np
 import matplotlib
 
 from sheet_manager.data_model.piece import Piece
+from sheet_manager.data_model.util import SheetManagerDBError
 
 matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
@@ -77,13 +78,14 @@ PIECES = MOZART_PIECES + BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_
 TARGET_DIR = "/home/matthias/mounts/home@rechenknecht1/Data/sheet_localization/real_music_sf"
 # TARGET_DIR = "/home/matthias/cp/data/sheet_localization/real_music_sf"
 
-tempo_ratios = np.arange(0.9, 1.1, 0.025)  # [0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15]
-sound_fonts = ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]  # ["Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]
+#tempo_ratios = np.arange(0.9, 1.1, 0.025)  # [0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15]
+# sound_fonts = ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]  # ["Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]
 # ["Steinway", "Acoustic_Piano", "Bright_Yamaha_Grand", "Unison", "Equinox_Grand_Pianos", "FluidR3_GM", "Premium_Grand_C7_24"]
 
 # todo: remove this
-PIECES = BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES
-tempo_ratios = [1.0]
+# PIECES = BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES
+
+tempo_ratios = [0.9, 1.0, 1.1]
 sound_fonts = ["FluidR3_GM"]
 
 
@@ -113,6 +115,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.actionOpen_sheet.triggered.connect(self.open_sheet)
         self.pushButton_open.clicked.connect(self.open_sheet)
 
+        self.comboBox_score.activated.connect(self.update_current_score)
+        self.comboBox_performance.activated.connect(self.update_current_performance)
+
         # connect to omr menu
         self.actionInit.triggered.connect(self.init_omr)
         self.actionDetect_note_heads.triggered.connect(self.detect_note_heads)
@@ -125,29 +130,35 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.checkBox_showSystems.stateChanged.connect(self.plot_sheet)
         self.checkBox_showBars.stateChanged.connect(self.plot_sheet)
 
-        # connect to buttons
+        # Workflow for generating
         self.pushButton_mxml2midi.clicked.connect(self.mxml2midi)
         self.pushButton_ly2PdfMidi.clicked.connect(self.ly2pdf_and_midi)
+        self.pushButton_pdf2Img.clicked.connect(self.pdf2img)
         self.pushButton_pdf2Coords.clicked.connect(self.pdf2coords)
-        self.pushButton_loadSpectrogram.clicked.connect(self.load_spectrogram)
         self.pushButton_renderAudio.clicked.connect(self.render_audio)
-        self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
         self.pushButton_extractPerformanceFeatures.clicked.connect(
             self.extract_performance_features)
-        self.pushButton_parseAllMidis.clicked.connect(self.parse_all_midis)
-        self.pushButton_copySheets.clicked.connect(self.copy_sheets)
-        self.pushButton_prepareAll.clicked.connect(self.prepare_all_audio)
+        self.pushButton_audio2sheet.clicked.connect(self.match_audio2sheet)
+
+        # Editing coords
         self.pushButton_editCoords.clicked.connect(self.edit_coords)
         self.pushButton_loadSheet.clicked.connect(self.load_sheet)
+        self.pushButton_loadPerformanceFeatures.clicked.connect(
+            self.load_performance_features)
         self.pushButton_loadCoords.clicked.connect(self.load_coords)
         self.pushButton_saveCoords.clicked.connect(self.save_coords)
-        self.pushButton_audio2sheet.clicked.connect(self.match_audio2sheet)
-        self.pushButton_pdf2Img.clicked.connect(self.pdf2img)
 
         self.spinBox_window_top.valueChanged.connect(self.update_staff_windows)
         self.spinBox_window_bottom.valueChanged.connect(self.update_staff_windows)
         self.spinBox_page.valueChanged.connect(self.edit_coords)
 
+        # Deprecated in favor of batch rocessing
+        self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
+        self.pushButton_copySheets.clicked.connect(self.copy_sheets)
+        self.pushButton_prepareAll.clicked.connect(self.prepare_all_audio)
+        self.pushButton_parseAllMidis.clicked.connect(self.parse_all_midis)
+
+        # Params for sheet editing: system bbox --> roi
         self.window_top = self.spinBox_window_top.value()
         self.window_bottom = self.spinBox_window_bottom.value()
 
@@ -156,15 +167,23 @@ class SheetManager(QtGui.QMainWindow, form_class):
         if not os.path.exists("tmp"):
             os.mkdir("tmp")
 
+        # Refactoring to use the piece-performance-score data model
         self.piece = None
+        self.current_performance = None
+        self.current_score = None
 
+        # Old interface...
+        self.folder_name = None
+        self.piece_name = None
+
+        # Piece encoding files
         self.lily_file = None
         self.mxml_file = None
-        self.pdf_file = None
         self.midi_file = None
 
         self.lily_normalized_file = None
 
+        # Score Elements Editor
         self.fig = None
         self.fig_manager = None
         self.click_0 = None
@@ -178,17 +197,19 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.page_rois = None
         self.page_bars = None
 
-        self.sheet_version = None
+        # Current score properties
+        self.score_name = None
+        self.pdf_file = None
         self.sheet_folder = None
         self.coord_folder = None
-
-        self.folder_name = None
-        self.piece_name = None
 
         self.omr = None
 
         self.axis_label_fs = 16
 
+        # Current performance properties
+        self.performance_name = None
+        # Expected features
         self.midi_matrix = None
         self.spec = None
         self.onsets = None
@@ -243,7 +264,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # Audio
         self.render_audio()
         self.extract_performance_features()
-        self.load_spectrogram()
+        self.load_performance_features()
 
         # OMR
         self.load_sheet()
@@ -285,50 +306,107 @@ class SheetManager(QtGui.QMainWindow, form_class):
                       authority_format=workflow)
         self.piece = piece
 
+        self._refresh_score_and_performance_selection()
+
+        self.update_current_performance()
+        self.update_current_score()
+
+        if self.pdf_file is not None:
+            self.lineEdit_pdf.setText(self.pdf_file)
+        else:
+            self.lineEdit_pdf.setText("")
+
         # Old workflow.
         self.piece_name = piece_name
+        self.folder_name = piece.folder
 
-        # selected sheet version
-        self.sheet_version = self.spinBox_sheetVersion.value()
-        self.sheet_version = "_%02d" % self.sheet_version if self.sheet_version > 0 else ""
+        # compile encoding file paths
+        self.mxml_file = self.piece.encodings.get('mxml', "")
+        self.lily_file = self.piece.encodings.get('ly', "")
+        self.midi_file = self.piece.encodings.get('midi', "")
 
-        # initialize folder structure
-        self.sheet_folder = "sheet" + self.sheet_version
-        self.coord_folder = "coords" + self.sheet_version
-        for sub_dir in [self.sheet_folder, "spec", "audio", self.coord_folder]:
-            sub_path = os.path.join(self.folder_name, sub_dir)
-            if not os.path.exists(sub_path):
-                os.mkdir(sub_path)
+        self.lily_normalized_file = self.piece.encodings.get('norm.ly', "")
 
-        # compile file paths
-        self.mxml_file = os.path.join(self.folder_name, self.piece_name + '.xml')
-        self.lily_file = os.path.join(self.folder_name, self.piece_name + '.ly')
-        self.midi_file = glob.glob(os.path.join(self.folder_name, self.piece_name) + '.mid*')
-        self.pdf_file = os.path.join(self.folder_name, self.piece_name + self.sheet_version + '.pdf')
-
-        self.lily_normalized_file = os.path.join(self.folder_name, self.piece_name + '.norm.ly')
-
-        if len(self.midi_file) == 0:
-            self.midi_file = ""
-        else:
-            self.midi_file = self.midi_file[0]
-
-        # check if files exist
-        if not os.path.exists(self.mxml_file):
-            self.mxml_file = ""
-
-        if not os.path.exists(self.lily_file):
-            self.lily_file = ""
-            self.lily_normalized_file = ""
-
-        if not os.path.exists(self.pdf_file):
-            self.pdf_file = ""
-
-        # set gui elements
+        # update gui elements
         self.lineEdit_mxml.setText(self.mxml_file)
         self.lineEdit_lily.setText(self.lily_file)
         self.lineEdit_midi.setText(self.midi_file)
-        self.lineEdit_pdf.setText(self.pdf_file)
+
+    def update_current_score(self):
+        """Reacts to a change in the score that SheetManager is supposed
+        to be currently processing."""
+        score_name = str(self.comboBox_score.currentText())
+        self.set_current_score(score_name)
+
+    def set_current_score(self, score_name):
+        """Set the current Score."""
+        if (score_name is None) or (score_name == ""):
+            logging.info('Selection provided no score; probably because'
+                         ' no scores are available.')
+            return
+
+        try:
+            current_score = self.piece.load_score(score_name)
+        except SheetManagerDBError as e:
+            print('Could not load score {0}: malformed?'
+                  ' Error message: {1}'.format(score_name, e.message))
+            return
+
+        self.score_name = score_name
+        self.current_score = current_score
+
+        self.pdf_file = self.current_score.pdf_file
+        self.sheet_folder = self.current_score.img_dir
+        self.coord_folder = self.current_score.coords_dir
+
+    def update_current_performance(self):
+        perf_name = str(self.comboBox_performance.currentText())
+        self.set_current_performance(perf_name)
+
+    def set_current_performance(self, perf_name):
+        if (perf_name is None) or (perf_name == ""):
+            logging.info('Selection provided no performance; probably because'
+                         ' no performances are available.')
+            return
+
+        try:
+            current_performance = self.piece.load_performance(perf_name)
+        except SheetManagerDBError as e:
+            print('Could not load performance {0}: malformed?'
+                  ' Error message: {1}'.format(perf_name, e.message))
+            return
+
+        self.current_performance = current_performance
+        self.performance_name = perf_name
+
+    def _refresh_score_and_performance_selection(self):
+        """Synchronizes the selection of scores and performances.
+        Tries to retain the previous score/performance."""
+        old_score_idx = self.comboBox_score.currentIndex()
+        old_score = str(self.comboBox_score.itemText(old_score_idx))
+
+        old_perf_idx = self.comboBox_performance.currentIndex()
+        old_perf = str(self.comboBox_performance.itemText(old_perf_idx))
+
+        self.piece.update()
+
+        self.comboBox_score.clear()
+        self.comboBox_score.addItems(self.piece.available_scores)
+        if old_score in self.piece.available_scores:
+            idx = self.piece.available_scores.index(old_score)
+            self.comboBox_score.setCurrentIndex(idx)
+        else:
+            self.comboBox_score.setCurrentIndex(0)
+            self.update_current_score()
+
+        self.comboBox_performance.clear()
+        self.comboBox_performance.addItems(self.piece.available_performances)
+        if old_perf in self.piece.available_performances:
+            idx = self.piece.available_performances.index(old_perf)
+            self.comboBox_performance.setCurrentIndex(idx)
+        else:
+            self.comboBox_performance.setCurrentIndex(0)
+            self.update_current_performance()
 
     def ly2pdf_and_midi(self):
         """Convert the LilyPond file to PDF and MIDI (which is done automatically, if the Ly
@@ -342,7 +420,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
             return
 
         # Set PDF paths. LilyPond needs the output path without the .pdf suffix
-        pdf_path_nosuffix = os.path.join(self.folder_name, self.piece_name + self.sheet_version)
+        # This creates the default PDF.
+        pdf_path_nosuffix = os.path.join(self.folder_name, self.piece_name)
         pdf_path = pdf_path_nosuffix + '.pdf'
 
         cmd_base = 'lilypond'
@@ -365,24 +444,34 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # If successful, the PDF file will be there:
         if os.path.isfile(pdf_path):
-            self.pdf_file = pdf_path
+            self.piece.add_score(name=self.piece.default_score_name,
+                                 pdf_file=pdf_path,
+                                 overwrite=True)
+
+            self.set_current_score(self.piece.default_score_name)
             self.lineEdit_pdf.setText(self.pdf_file)
+
+            # Cleanup!
+            os.unlink(pdf_path)
+
         else:
-            print('Warning: LilyPond did not generate PDF file.')
+            print('Warning: LilyPond did not generate PDF file.'
+                  ' Something went badly wrong.')
 
         # Check if the MIDI file was actually created.
         output_midi_file = os.path.join(self.folder_name, self.piece_name) + '.mid'
         if not os.path.isfile(output_midi_file):
-            output_midi_file += 'i'
+            output_midi_file += 'i'  # If it is not *.mid, maybe it has *.midi
             if not os.path.isfile(output_midi_file):
                 print('Warning: LilyPond did not generate corresponding MIDI file. Check *.ly source'
                       ' file for \\midi { } directive.')
-                return
-        self.midi_file = output_midi_file
-        self.lineEdit_midi.setText(self.midi_file)
+            else:
+                self.midi_file = output_midi_file
+                self.lineEdit_midi.setText(self.midi_file)
 
         # Update with the MIDI encoding
         self.piece.update()
+        self._refresh_score_and_performance_selection()
 
     def normalize_ly(self):
         """ Converts lilypond file to absolute. There is a sanity check:
@@ -397,7 +486,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
             print('Cannot normalize, LilyPond file is missing!')
             return
 
-        self.lily_normalized_file = os.path.join(self.folder_name, self.piece_name + '.norm.ly')
+        lily_normalized_fname = os.path.splitext(self.lily_file)[0] + '.norm.ly'
+        self.lily_normalized_file = os.path.join(self.piece.folder,
+                                                 lily_normalized_fname)
         os.system('cp {0} {1}'.format(self.lily_file, self.lily_normalized_file))
 
         if not os.path.exists(self.lily_normalized_file):
@@ -427,17 +518,24 @@ class SheetManager(QtGui.QMainWindow, form_class):
         if os.path.isfile(_ly_norm_backup_file):
             os.unlink(_ly_norm_backup_file)
 
+        # Update the encodings dict to include the *.norm.ly file
+        self.piece.update()
+
     def pdf2img(self):
         """ Convert pdf file to image """
 
         self.status_label.setText("Convert pdf to images ...")
         os.system("rm tmp/*.png")
-        pdf_path = os.path.join(self.folder_name, self.piece_name + self.sheet_version + '.pdf')
+        pdf_path = self.current_score.pdf_file
+        # pdf_path = os.path.join(self.folder_name,
+        #                         self.piece_name +
+        #                         self.score_name + '.pdf')
         cmd = "convert -density 150 %s -quality 90 tmp/page.png" % pdf_path
         os.system(cmd)
 
         self.status_label.setText("Resizing images ...")
-        img_dir = os.path.join(self.folder_name, self.sheet_folder)
+        img_dir = self.current_score.img_dir
+        self.current_score.clear_images()
 
         file_paths = glob.glob("tmp/*.png")
         file_paths = natsort(file_paths)
@@ -561,6 +659,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                            audio_file=audio_file,
                                            midi_file=perf_midi_file,
                                            overwrite=True)
+                # Cleanup!
+                os.unlink(audio_file)
+                os.unlink(perf_midi_file)
 
         self.status_label.setText("done!")
 
@@ -568,8 +669,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """
         Render audio from midi for all pieces.
         """
-        warnings.warn('Will be replaced by batch processing.',
+        warnings.warn('Replaced by batch processing.',
                       DeprecationWarning)
+        return
 
         self.status_label.setText("Rendering audios ...")
         from render_audio import render_audio
@@ -686,23 +788,41 @@ class SheetManager(QtGui.QMainWindow, form_class):
         
         self.status_label.setText("done!")
 
-    def load_spectrogram(self):
+    def load_performance_features(self):
         """
-        Load spectrogram and onsets
+        Load spectrogram, MIDI matrix and onsets from the current performance.
         """
+        if self.current_performance is None:
+            logging.warning('Cannot load performance features without'
+                            ' selecting a performance!')
+            return
 
-        # set file paths
-        pattern = self.folder_name + "/audio/*.mid*"
-        midi_file_path = glob.glob(pattern)[0]
-        directory = os.path.dirname(midi_file_path)
-        file_name = os.path.basename(midi_file_path).split('.')[0]
-        spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
-        onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
+        try:
+            midi_matrix = self.current_performance.load_midi_matrix()
+        except SheetManagerDBError as e:
+            logging.warning('Loading midi matrix from current performance {0}'
+                            ' failed: {1}'.format(self.current_performance.name,
+                                                  e.message))
+            return
+        self.midi_matrix = midi_matrix
 
-        print("Loading spectrogram from:")
-        print(spec_file_path)
-        self.spec = np.load(spec_file_path)
-        self.onsets = np.load(onset_file_path)
+        try:
+            onsets = self.current_performance.load_onsets()
+        except SheetManagerDBError as e:
+            logging.warning('Loading onsets from current performance {0}'
+                            ' failed: {1}'.format(self.current_performance.name,
+                                                  e.message))
+            return
+        self.onsets = onsets
+
+        try:
+            spectrogram = self.current_performance.load_spectrogram()
+        except SheetManagerDBError as e:
+            logging.warning('Loading spectrogram from current performance {0}'
+                            ' failed: {1}'.format(self.current_performance.name,
+                                                  e.message))
+            return
+        self.spec = spectrogram
 
         # set number of onsets in gui
         self.lineEdit_nOnsets.setText(str(len(self.onsets)))
@@ -711,8 +831,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """
         Parse midi file for all pieces.
         """
-        warnings.warn('Will be replaced by batch processing.',
+        warnings.warn('Replaced by batch processing.',
                       DeprecationWarning)
+        return
 
         self.status_label.setText("Parsing midis ...")
 
@@ -764,7 +885,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """
         warnings.warn('Copying sheets was an application-dependent operation'
                       ' for extracting aligned png/audio patches for multimodal'
-                      ' score following.', DeprecationWarning)
+                      ' score following. Replaced by batch processing.',
+                      DeprecationWarning)
+        return
+
         self.status_label.setText("Copying sheets ...")
 
         for i, piece in enumerate(PIECES):
@@ -786,10 +910,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """ Call all preparation steps for all audios """
         warnings.warn('prepare_all_audio() was an application-dependent op'
                       ' for extracting aligned png/audio patches for multimodal'
-                      ' score following.', DeprecationWarning)
-        self.render_all_audios()
-        self.parse_all_midis()
-        self.copy_sheets()
+                      ' score following. Replaced by batch processing.',
+                      DeprecationWarning)
+        return
+        # self.render_all_audios()
+        # self.parse_all_midis()
+        # self.copy_sheets()
 
     def load_sheet(self):
         """Load sheet images of current piece to prepare for OMR
@@ -804,8 +930,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.page_bars = []
 
         # prepare paths
-        sheet_dir = os.path.join(self.folder_name, self.sheet_folder)
-        img_files = np.sort(glob.glob(sheet_dir + "/*.*"))
+        img_files = self.current_score.image_files
 
         # initialize page data (currently loads just empty coords)
         n_pages = len(img_files)
@@ -839,7 +964,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("Loading system coords ...")
 
         # prepare paths
-        coord_dir = os.path.join(self.folder_name, self.coord_folder)
+        coord_dir = self.current_score.coords_dir
         coord_files = np.sort(glob.glob(coord_dir + "/systems_*.npy"))
 
         # load data
@@ -858,7 +983,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("Loading system coords ...")
 
         # prepare paths
-        coord_dir = os.path.join(self.folder_name, self.coord_folder)
+        coord_dir = self.current_score.coords_dir
         coord_files = np.sort(glob.glob(coord_dir + "/bars_*.npy"))
 
         # load data
@@ -876,7 +1001,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("Loading coords ...")
 
         # prepare paths
-        coord_dir = os.path.join(self.folder_name, self.coord_folder)
+        coord_dir = self.current_score.coords_dir
         coord_files = np.sort(glob.glob(coord_dir + "/notes_*.npy"))
 
         # load data
@@ -985,21 +1110,21 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def save_note_coords(self):
         """ Save current note coordinates. """
-        coord_dir = os.path.join(self.folder_name, self.coord_folder)
+        coord_dir = self.current_score.coords_dir
         for i in xrange(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "notes_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_coords[i])
 
     def save_bar_coords(self):
         """ Save current bar coordinates. """
-        coord_dir = os.path.join(self.folder_name, self.coord_folder)
+        coord_dir = self.current_score.coords_dir
         for i in xrange(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "bars_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_bars[i])
 
     def save_system_coords(self):
         """ Save current bar coordinates. """
-        coord_dir = os.path.join(self.folder_name, self.coord_folder)
+        coord_dir = self.current_score.coords_dir
         for i in xrange(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "systems_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_systems[i])

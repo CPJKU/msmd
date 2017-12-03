@@ -12,6 +12,7 @@ import time
 import yaml
 
 from sheet_manager.data_model.performance import Performance
+from sheet_manager.data_model.score import Score
 from sheet_manager.data_model.util import SheetManagerDBError
 
 __version__ = "0.0.1"
@@ -117,6 +118,18 @@ class Piece(object):
         self.performances = self.collect_performances()
         self.scores = self.collect_scores()
 
+    @property
+    def available_performances(self):
+        return sorted(self.performances.keys())
+
+    @property
+    def available_scores(self):
+        return sorted(self.scores.keys())
+
+    @property
+    def default_score_name(self):
+        return self.name + '_' + self.authority_format
+
     def _ensure_piece_structure(self):
         """Creates the basic expected directory structure."""
         if not os.path.isdir(self.performance_dir):
@@ -126,10 +139,20 @@ class Piece(object):
 
     def load_score(self, score_name):
         self.update()
-        raise NotImplementedError()
+        if score_name not in self.scores:
+            raise SheetManagerDBError('Piece {0} in collection {1} does'
+                                      ' not have a score with name {2}.'
+                                      ' Available scores: {3}'
+                                      ''.format(self.name, self.collection_root,
+                                                score_name,
+                                                self.available_scores))
+        score_dir = self.scores[score_name]
+        score = Score(folder=score_dir, piece_name=self.name)
+        return score
 
     def load_all_scores(self, score_name):
-        raise NotImplementedError()
+        """Returns a list of all the available Scores."""
+        return [self.load_score(s) for s in self.available_scores]
 
     def load_performance(self, performance_name):
         """Creates a ``Performance`` object for the given performance
@@ -141,15 +164,15 @@ class Piece(object):
                                       ' Available performances: {3}'
                                       ''.format(self.name, self.collection_root,
                                                 performance_name,
-                                                self.performances.keys()))
+                                                self.available_performances))
         performance_dir = self.performances[performance_name]
-        performance = Performance(dir=performance_dir,
+        performance = Performance(folder=performance_dir,
                                   piece_name=self.name)
         return performance
 
     def load_all_performances(self):
         """Returns a list of all the available Performances."""
-        return [self.load_performance(p) for p in self.performances]
+        return [self.load_performance(p) for p in self.available_performances]
 
     def update(self):
         """Refreshes the index of available performances
@@ -186,7 +209,8 @@ class Piece(object):
         in the ``self.performance_dir`` directory), values are
         the paths to these directories."""
         performances = {p: os.path.join(self.performance_dir, p)
-                        for p in os.listdir(self.performance_dir)}
+                        for p in os.listdir(self.performance_dir)
+                        if os.path.isdir(os.path.join(self.performance_dir, p))}
         return performances
 
     def collect_scores(self):
@@ -195,12 +219,27 @@ class Piece(object):
         in the ``self.score_dir`` directory), values are
         the paths to these directories."""
         scores = {s: os.path.join(self.score_dir, s)
-                  for s in os.listdir(self.score_dir)}
+                  for s in os.listdir(self.score_dir)
+                  if os.path.isdir(os.path.join(self.score_dir, s))}
         return scores
 
     def collect_encodings(self):
-        """Collects various encodings that SheetManager can deal with
-        as authority."""
+        """Collects various encodings that SheetManager can deal with:
+
+        * MusicXML (*.xml)
+        * LilyPond (*.ly)
+        * Normalize LilyPond (*.norm.ly)
+        * MIDI (*.midi)
+        * MEI (*.mei)
+
+        Out of these, the authority encoding can be chosen, but it has
+        to be one of a more restricted set, as specified by the
+        ``AVAILABLE_AUTHORITIES`` class attribute.
+
+        :returns: A dict of the encoding files. The keys are the encoding
+            names: ``mxml``, ``ly``, ``norm.ly``, ``midi``, ``mei``
+            (if the corresponding files are available).
+        """
         encodings = dict()
 
         mxml = os.path.join(self.folder, self.name + '.xml')
@@ -210,6 +249,10 @@ class Piece(object):
         ly = os.path.join(self.folder, self.name + '.ly')
         if os.path.isfile(ly):
             encodings['ly'] = ly
+
+        normalized_ly = os.path.join(self.folder, self.name + '.norm.ly')
+        if os.path.isfile(normalized_ly):
+            encodings['norm.ly'] = normalized_ly
 
         midi = os.path.join(self.folder, self.name + '.mid')
         if not os.path.isfile(midi):
@@ -238,11 +281,12 @@ class Piece(object):
 
     def clear_performances(self):
         """Remove all performances. Use this carefully!"""
+        self.update()
         for p in self.performances:
             self.remove_performance(p)
 
     def remove_performance(self, name):
-        """Removes the given performance."""
+        """Removes the given performance folder."""
         self.update()
         if name not in self.performances:
             logging.warn('Piece {0}: trying to remove performance {1},'
@@ -288,17 +332,70 @@ class Piece(object):
         os.mkdir(new_performance_dir)
 
         audio_fmt = os.path.splitext(audio_file)[-1]
-        perf_audio_filename = os.path.join(new_performance_dir,
+        performance_audio_filename = os.path.join(new_performance_dir,
                                            name + audio_fmt)
-        shutil.copyfile(audio_file, perf_audio_filename)
+        shutil.copyfile(audio_file, performance_audio_filename)
 
         if midi_file:
             midi_fmt = os.path.splitext(midi_file)[-1]
-            perf_midi_filename = os.path.join(new_performance_dir,
-                                              name + midi_fmt)
-            shutil.copyfile(midi_file, perf_midi_filename)
+            performance_midi_filename = os.path.join(new_performance_dir,
+                                                     name + midi_fmt)
+            shutil.copyfile(midi_file, performance_midi_filename)
 
         self.update()
 
         # Test-load the Performance. Ensures folder structure initialization.
         _ = self.load_performance(name)
+
+    def clear_scores(self):
+        """Removes all scores of the piece. Use this carefully!"""
+        self.update()
+        for s in self.scores:
+            self.remove_score(s)
+
+    def remove_score(self, name):
+        """Removes the given score folder."""
+        self.update()
+        if name not in self.scores:
+            logging.warn('Piece {0}: trying to remove score {1},'
+                         ' but it does not exist!'.format(self.name, name))
+            return
+
+        shutil.rmtree(self.scores[name])
+        self.update()
+
+    def add_score(self, name, pdf_file, overwrite=False):
+        """Creates a new score in the piece from an existing PDF file.
+
+        :param name: Name of the new score. The score folder
+            will have this name, and the score PDF file
+            names will be derived from this name by simply
+            adding the ``.pdf`` suffix to the name.
+
+        :param pdf_file: The PDF authority for the given score. Will be copied
+            into the newly created score directory, with the filename
+            derived as the `name`` plus the ``.pdf`` suffix. Required.
+
+        :param overwrite: If true, if a score with the given ``name``
+            exists, will delete it and overwrite with the new one.
+        """
+        if name in self.scores:
+            if overwrite:
+                logging.warning('Piece {0}: performance {1} already exists,'
+                                ' overwriting!'.format(self.name, name))
+                time.sleep(5)
+                self.remove_score(name)
+            else:
+                raise SheetManagerDBError('Piece {0}: performance {1} already'
+                                          ' exists!'.format(self.name, name))
+        new_score_dir = os.path.join(self.score_dir, name)
+
+        os.mkdir(new_score_dir)
+
+        score_pdf_filename = os.path.join(new_score_dir, name + '.pdf')
+        shutil.copyfile(pdf_file, score_pdf_filename)
+
+        self.update()
+
+        # Test-load the Score. Ensures folder structure initialization.
+        _ = self.load_score(name)
