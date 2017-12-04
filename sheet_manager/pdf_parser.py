@@ -68,15 +68,15 @@ def parse_pdf(fname, target_width=None, with_links=False,
         Note that the CropObjects' ``objid`` attribute is set
         so that they do not collide across pages. However, CropObjects
         from various pages have the page number added to their
-        ``document_name`` component of their UID.
-
+        ``document_name`` component of their UID. Keep this in mind
+        if you want to merge them later.
 
     """
     centroids = dict()
     bboxes = dict()
 
     cropobjects_per_page = dict()
-    _current_objid = 0
+    _current_objid = 0  # We keep the OBJID
     if collection_name is None:
         collection_name = CropObject.UID_DEFAULT_DATASET_NAMESPACE
     if score_name is None:

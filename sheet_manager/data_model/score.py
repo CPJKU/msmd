@@ -171,6 +171,19 @@ class Score(object):
 
         self.update()
 
+    def view_files(self, view_name):
+        """Return a list of the paths to all (non-hidden) files
+        in the view."""
+        self.update()
+        if view_name not in self.views:
+            raise SheetManagerDBError('Score {0}: requested view {1}'
+                                      ' not available!'
+                                      ''.format(self.name, view_name))
+        view_dir = self.views[view_name]
+        return [os.path.join(view_dir, f) for f in os.listdir(view_dir)
+                if (not f.startswith('.')) and
+                   (os.path.isfile(os.path.join(view_dir, f)))]
+
     def clear_view(self, view_name):
         """Removes the given view."""
         self.update()

@@ -56,6 +56,7 @@ import numpy as np
 import matplotlib
 from muscima.io import export_cropobject_list
 
+from sheet_manager.alignments import mung_midi_from_ly_links
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
 
@@ -438,7 +439,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         if suppress_midi:
             cmd_options += ' {0}'.format(cmd_suppress_midi)
 
-        cmd = cmd_base + ' -o {0} '.format(pdf_path_nosuffix) + cmd_options + ' {0}'.format(self.lily_file)
+        cmd = cmd_base + ' -o {0} '.format(pdf_path_nosuffix) \
+              + cmd_options \
+              + ' {0}'.format(self.lily_normalized_file)
 
         # Run LilyPond here.
         os.system(cmd)
@@ -496,9 +499,16 @@ class SheetManager(QtGui.QMainWindow, form_class):
             print('Initializing normalized LilyPond file {0} failed!')
             return
 
+        # Translate to default pitch language?
+        translate_cmd = 'ly -i "translate english" {0}'.format(self.lily_normalized_file)
+        print('Normalizing LilyPond: translating pitch names: {0}'.format(translate_cmd))
+        os.system(translate_cmd)
+
+        # Convert to absolute
         base_cmd = 'ly rel2abs'
         cmd = base_cmd + ' -i {0}'.format(self.lily_normalized_file)
 
+        print('Normalizing LilyPond: moving to absolute: {0}'.format(cmd))
         os.system(cmd)
 
         # Check if the normalization didn't produce an absurd number of apostrophes.
@@ -592,7 +602,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         centroids, bboxes, cropobjects = parse_pdf(self.pdf_file,
                                                    target_width=self.target_width,
                                                    with_links=True,
-                                                   collection_name=self.piece.collection_root,
+                                                   collection_name=os.path.basename(self.piece.collection_root),
                                                    score_name=self.current_score.name)
         # centroids = pdf2coords(self.pdf_file, target_width=self.target_width)
 
@@ -616,6 +626,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # update sheet statistics
         self.update_sheet_statistics()
+
+        # Add MuNG MIDI pitch codes
+        cropobjects = {page: mung_midi_from_ly_links(cropobjects[page])
+                       for page in cropobjects}
 
         # Save MuNG
         cropobject_strings = {page: export_cropobject_list(cropobjects[page])
