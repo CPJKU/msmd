@@ -126,7 +126,8 @@ def render_audio(input_midi_path, sound_font,
     # get file names and directories
     file_name = os.path.basename(input_midi_path)
     directory = target_dir if target_dir else os.path.dirname(input_midi_path)
-    audio_directory = os.path.join(directory, 'audio')
+
+    audio_directory = "tmp" # os.path.join(directory, 'audio')
     if not os.path.exists(audio_directory):
         os.mkdir(audio_directory)
 

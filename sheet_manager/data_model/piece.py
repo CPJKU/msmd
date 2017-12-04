@@ -95,8 +95,8 @@ class Piece(object):
                              ''.format(authority_format))
 
         self.name = name
-        self.folder = piece_folder
-        self.collection_root = root
+        self.folder = os.path.normpath(piece_folder)
+        self.collection_root = os.path.normpath(root)
 
         self.performance_dir = os.path.join(self.folder, 'performances')
         self.score_dir = os.path.join(self.folder, 'scores')

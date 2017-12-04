@@ -54,6 +54,7 @@ import numpy as np
 
 # set backend to qt
 import matplotlib
+from muscima.io import export_cropobject_list
 
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
@@ -66,7 +67,7 @@ from matplotlib.collections import PatchCollection
 form_class = uic.loadUiType("gui/main.ui")[0]
 
 from utils import sort_by_roi, natsort, get_target_shape
-from pdf_parser import pdf2coords
+from pdf_parser import pdf2coords, parse_pdf
 from colormaps import cmaps
 
 from midi_parser import MidiParser
@@ -567,6 +568,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("done!")
 
     def pdf2coords(self):
+        """Extracts notehead centroid coords and MuNG features
+        from the PDF of the current Score. Saves them to the ``coords/``
+        and ``mung/`` view."""
         print("Extracting coords from pdf ...")
         self.status_label.setText("Extracting coords from pdf ...")
 
@@ -585,7 +589,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
             return
 
         # Run PDF coordinate extraction
-        centroids = pdf2coords(self.pdf_file, target_width=self.target_width)
+        centroids, bboxes, cropobjects = parse_pdf(self.pdf_file,
+                                                   target_width=self.target_width,
+                                                   with_links=True,
+                                                   collection_name=self.piece.collection_root,
+                                                   score_name=self.current_score.name)
+        # centroids = pdf2coords(self.pdf_file, target_width=self.target_width)
 
         # Check that the PDF corresponds to the generated images...
         if len(centroids) != n_pages:
@@ -607,6 +616,15 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # update sheet statistics
         self.update_sheet_statistics()
+
+        # Save MuNG
+        cropobject_strings = {page: export_cropobject_list(cropobjects[page])
+                              for page in cropobjects}
+        self.current_score.add_paged_view('mung', cropobject_strings,
+                                          file_fmt='xml',
+                                          binary=False,
+                                          prefix=None,
+                                          overwrite=True)
 
         if self.checkBox_showExtractedCoords.isChecked():
             # Maybe we already have the ROIs for this image.
@@ -659,6 +677,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                            audio_file=audio_file,
                                            midi_file=perf_midi_file,
                                            overwrite=True)
+                self.piece.update()
+                self._refresh_score_and_performance_selection()
+
                 # Cleanup!
                 os.unlink(audio_file)
                 os.unlink(perf_midi_file)

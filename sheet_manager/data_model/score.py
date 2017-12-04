@@ -3,7 +3,8 @@ from __future__ import print_function
 
 import logging
 import os
-
+import shutil
+import time
 import yaml
 
 from sheet_manager.data_model.util import SheetManagerDBError, path2name
@@ -36,7 +37,7 @@ class Score(object):
         :param piece_name: Name of the Piece to which the Score belongs.
         """
         if not os.path.isdir(folder):
-            raise SheetManagerDBError('Performance initialized with'
+            raise SheetManagerDBError('Score initialized with'
                                       ' non-existent directory: {0}'
                                       ''.format(folder))
         self.folder = folder
@@ -53,6 +54,12 @@ class Score(object):
         self.coords_dir = os.path.join(self.folder, 'coords')
         self._ensure_directory_structure()
 
+        self.views = self.collect_views()
+
+    def update(self):
+        self.pdf_file = self.discover_pdf()
+        self._ensure_directory_structure()
+        self.metadata = self.load_metadata()
         self.views = self.collect_views()
 
     @property
@@ -91,6 +98,91 @@ class Score(object):
         for f in os.listdir(self.img_dir):
             os.unlink(os.path.join(self.img_dir, f))
 
+    @staticmethod
+    def format_page_name(page):
+        """Implements the naming convention for page numbers in the view
+        files.
+
+        If ``page`` is an integer, the method adds 1 and formats it
+        as a two-digit string, with a leading zero if necessary.
+
+        If ``page`` is anything else than an integer, applies ``str()``.
+        """
+        if isinstance(page, int):
+            page_str = '{0:02d}'.format(page + 1)
+        else:
+            page_str = str(page)
+        return page_str
+
+    def add_paged_view(self, view_name, view_data_per_page,
+                       file_fmt,
+                       binary=False,
+                       prefix=None,
+                       overwrite=False):
+        """Adds a view of the Score from the given data. The data is expected
+        to be a dict with page numbers as keys. The values are expected to be
+        already formatted so that they can be simply dumped into an open file
+        stream.
+
+        Filenames in the view will be constructed as ``prefix_page.file_fmt``
+        from the arguments ``file_fmt`` (required), ``prefix`` (not required),
+        and ``page`` is derived from the ``view_data_per_page`` keys (if the
+        keys are strings, then they are taken as-is; if the page keys are
+        integers, they are converted to a 2-digit string).
+
+        If ``overwrite`` is set and a view with ``view_name`` already exists,
+        it will be cleared and overwritten.
+        """
+        self.update()
+        if view_name in self.views:
+            if overwrite:
+                logging.warning('Score {0}: view {1} already exists;'
+                                ' overwriting...'.format(self.name,
+                                                         view_name))
+                time.sleep(3)
+                self.clear_view(view_name)
+            else:
+                logging.warning('Score {0}: view {1} already exists;'
+                                ' will not do anything.'.format(self.name,
+                                                                view_name))
+                return
+
+        if file_fmt.startswith('.'):
+            file_fmt = file_fmt[1:]
+
+        view_path = os.path.join(self.folder, view_name)
+        os.mkdir(view_path)
+        for page in view_data_per_page:
+
+            page_str = self.format_page_name(page)
+            page_fname = '{0}.{1}'.format(page_str, file_fmt)
+            if prefix is not None:
+                page_fname = '{0}_'.format(prefix) + page_fname
+            page_file_path = os.path.join(view_path, page_fname)
+
+            data = view_data_per_page[page]
+
+            mode = 'w'
+            if binary:
+                mode = 'wb'
+
+            with open(page_file_path, mode=mode) as hdl:
+                hdl.write(data)
+
+        self.update()
+
+    def clear_view(self, view_name):
+        """Removes the given view."""
+        self.update()
+        if view_name not in self.views:
+            raise SheetManagerDBError('Score {0}: requested clearing view'
+                                      ' {1}, but this view does not exist!'
+                                      ' (Available views: {2})'
+                                      ''.format(self.name, view_name,
+                                                self.views.keys()))
+        shutil.rmtree(self.views[view_name])
+        self.update()
+
     def collect_views(self):
         """Returns all available score views."""
         return {v: os.path.join(self.folder, v)
@@ -98,10 +190,11 @@ class Score(object):
                 if os.path.isdir(os.path.join(self.folder, v))}
 
     def load_metadata(self):
-        """Loads arbitrary YAML descriptors with the default name (meta.yml)."""
+        """Loads arbitrary YAML descriptors with the default name (meta.yml).
+        """
         metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
         if not os.path.isfile(metafile):
-            logging.warn('performance {0} has no metadata file: {1}'
+            logging.warn('Score {0} has no metadata file: {1}'
                          ''.format(self.name, self.DEFAULT_META_FNAME))
             return dict()
 

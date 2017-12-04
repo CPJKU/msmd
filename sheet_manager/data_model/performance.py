@@ -175,7 +175,7 @@ class Performance(object):
         """Loads arbitrary YAML descriptors with the default name (meta.yml)."""
         metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
         if not os.path.isfile(metafile):
-            logging.warn('performance {0} has no metadata file: {1}'
+            logging.warn('Performance {0} has no metadata file: {1}'
                          ''.format(self.name, self.DEFAULT_META_FNAME))
             return dict()
 
