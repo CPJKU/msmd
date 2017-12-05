@@ -654,7 +654,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
             corners_np = np.asarray(corners)
             self.page_systems[page] = corners_np
 
+        # Save systems & refresh
         self.save_system_coords()
+        self.sort_note_coords()
+        self.update_sheet_statistics()
 
         if self.checkBox_showExtractedCoords.isChecked():
             # Maybe we already have the ROIs for this image.
