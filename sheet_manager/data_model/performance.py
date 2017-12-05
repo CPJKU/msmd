@@ -220,6 +220,9 @@ class Performance(object):
         Expects the feature name ``self.audio_name + '_midi.npy'."""
         return self._load_feature_by_suffix('_spec.npy')
 
+    def load_note_events(self):
+        return self._load_feature_by_suffix('notes.npy')
+
     def _load_feature_by_suffix(self, suffix):
         """Utility function for loading features by suffix naming
         conventions."""

@@ -26,10 +26,14 @@ import string
 
 import abjad
 import numpy
-from mhr.muscimarker_io import cropobjects_merge_bbox
+from muscima.cropobject import cropobjects_merge_bbox, CropObject, link_cropobjects
+from muscima.graph import NotationGraph
+from muscima.inference_engine_constants import InferenceEngineConstants
 from muscima.io import parse_cropobject_list
 
+from sheet_manager.data_model.score import group_mungos_by_column
 from sheet_manager.data_model.util import SheetManagerDBError
+from sheet_manager.midi_parser import notes_to_onsets, FPS
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
@@ -91,9 +95,9 @@ class LilyPondLinkPitchParser(object):
                 print('PROCESS FOUND TIE: mungo objid = {0},'
                       ' location = {1}'.format(c.objid, (c.top, c.left)))
                 _n_ties += 1
-                c.data['tied'] = True
+                c.data['tied'] = 1
             else:
-                c.data['tied'] = False
+                c.data['tied'] = 0
 
             token = self.ly_token_from_location(row, col,
                                                 ly_data=self.ly_data_dict[fname])
@@ -306,42 +310,43 @@ def align_score_to_performance(score, performance):
     :param performance: A ``Performance`` instance. The MIDI matrix feature
         must be available.
 
-    :returns: A per-page dict of lists of ``(objid, [frame, pitch])`` tuples,
+    :returns: A list of ``(objid, note_idx)`` tuples,
         where the ``objid`` points to the corresponding MuNG object, and
-        ``[frame, pitch]`` is the frame and pitch index of the MIDI matrix
-        cell that corresponds to the onset of the note encoded by this
-        object.
+        ``note_idx`` is the MIDI-derived note object.
 
         Note that (a) not all MIDI matrix onsets have a corresponding visual
         object, (b) not all noteheads have a corresponding onset (ties!).
     """
-    score.update()
-    if 'mung' not in score.views:
-        raise SheetManagerDBError('Score {0}: mung view not available!'
-                                  ''.format(score.name))
-    mung_files = score.view_files('mung')
-    mungos_per_page = []
-    for f in mung_files:
-        mungos = parse_cropobject_list(f)
-        mungos_with_pitch = [c for c in mungos
-                                  if 'midi_pitch_code' in c.data]
-        mungos_per_page.append(mungos_with_pitch)
+    ordered_mungos = score.get_ordered_notes()
 
-    midi_matrix = performance.load_midi_matrix()
+    #  - Unroll MIDI matrix (onsets left to right, simultaneous pitches top-down).
+    note_events = performance.load_note_events()
 
-    # Algorithm:
-    #  - Create hard ordering constraints:
-    #     - pages (already done: mungos_per_page)
-    #     - systems
-    #     - left-to-right within systems
-    #     - simultaneity unrolling
-    #  - Unroll MIDI matrix (unambiguous)
-    #  - Align with In/Del
+    #  - Assign to each MuNG object the MIDI note properties
+    if len(note_events) != len(ordered_mungos):
+        print('Number of note events and pitched MuNG objects does not'
+              ' match: {0} note events, {1} MuNG objs.'
+              ''.format(len(note_events), len(ordered_mungos)))
 
-    raise NotImplementedError()
+    output = []
+    for note_event_idx, (m, e) in enumerate(zip(ordered_mungos, note_events)):
+        pitch_m = int(m.data['midi_pitch_code'])
+        pitch_e = int(e[1])
+
+        if pitch_m != pitch_e:
+            print('Pitch of MuNG object and corresponding MIDI note does not'
+                  ' match: MuNG {0}, event {1}'.format(pitch_m, pitch_e))
+
+        onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
+        m.data['{0}_onset_seconds'.format(performance.name)] = e[0]
+        m.data['{0}_onset_frame'.format(performance.name)] = int(onset_frame)
+
+        output.append((m.objid, note_event_idx))
+
+    return output
 
 
-def group_mungos_by_system(page_mungos, score_img, MIN_PEAK_WIDTH=5):
+def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_WIDTH=5):
     """Groups the MuNG objects on a page into systems. Assumes
     piano music: there is a system break whenever a pitch that
     overlaps horizontally and is lower on the page is higher
@@ -366,9 +371,7 @@ def group_mungos_by_system(page_mungos, score_img, MIN_PEAK_WIDTH=5):
     page_mungos = [m for m in page_mungos
                    if 'midi_pitch_code' in m.data]
 
-    mungo_dict = {m.objid: m for m in page_mungos}
-
-    sorted_mungo_columns = group_mungos_by_column(mungo_dict, page_mungos)
+    sorted_mungo_columns = group_mungos_by_column(page_mungos)
 
     logging.debug('Total MuNG object columns: {0}'
                   ''.format(len(sorted_mungo_columns)))
@@ -389,16 +392,19 @@ def group_mungos_by_system(page_mungos, score_img, MIN_PEAK_WIDTH=5):
     for t, l, b, r in dividers:
         canvas[t:b, l:r] += 1
 
-    ### DEBUG
-    import matplotlib
-    matplotlib.use('Qt4Agg')
-    import matplotlib.pyplot as plt
-    plt.imshow(score_img[:canvas_height, :canvas_width], cmap='gray')
-    plt.imshow(canvas[:canvas_height, :canvas_width], alpha=0.3)
-
     canvas_hproj = canvas.sum(axis=1)
-    plt.plot(canvas_hproj, numpy.arange(canvas_hproj.shape[0]))
-    plt.show()
+
+    ### DEBUG
+    if (score_img is not None) and (page_num is not None):
+        import matplotlib
+        matplotlib.use('Qt4Agg')
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.imshow(score_img[:canvas_height, :canvas_width], cmap='gray')
+        plt.imshow(canvas[:canvas_height, :canvas_width], alpha=0.3)
+
+        plt.plot(canvas_hproj, numpy.arange(canvas_hproj.shape[0]))
+        plt.show()
 
     # Now we find local peaks (or peak areas) of the projections.
     # - what is a peak? higher than previous, higher then next
@@ -536,41 +542,34 @@ def find_column_divider_regions(sorted_mungo_columns):
     return dividers
 
 
-def group_mungos_by_column(mungo_dict, page_mungos):
-    """Group symbols into columns."""
-    mungos_by_left = collections.defaultdict(list)
-    for m in page_mungos:
-        mungos_by_left[m.left].append(m)
-    rightmost_per_column = {l: max([m.right for m in mungos_by_left[l]])
-                            for l in mungos_by_left}
-    mungo_to_leftmost = {m.objid: m.left for m in page_mungos}
-    # Go greedily from left, take all objects that
-    # overlap horizontally by half of the given column
-    # width.
-    lefts_sorted = sorted(mungos_by_left.keys())
-    for i, l in list(enumerate(lefts_sorted))[:-1]:
-        if mungos_by_left[l] is None:
-            continue
-        r = rightmost_per_column[l]
-        mid_point = (l + r) / 2.
-        for l2 in lefts_sorted[i + 1:]:
-            if l2 >= mid_point:
-                break
-            for m in mungos_by_left[l2]:
-                mungo_to_leftmost[m.objid] = l
-            mungos_by_left[l2] = None
-    mungo_columns = collections.defaultdict(list)
-    for objid in mungo_to_leftmost:
-        l = mungo_to_leftmost[objid]
-        mungo_columns[l].append(mungo_dict[objid])
-
-    # ...sort the MuNG columns from top to bottom:
-    sorted_mungo_columns = {l: sorted(mungos, key=lambda x: x.top)
-                            for l, mungos in mungo_columns.items()}
-    return sorted_mungo_columns
-
-
-def build_system_mungos(system_boundaries, system_mungos):
+def build_system_mungos_on_page(system_boundaries, system_mungo_groups,
+                                start_objid):
     """Creates the ``staff`` MuNG objects from the given system
-    boudnaries."""
-    pass
+    boudnaries. Adds the inlinks/outlinks to the other MuNG object
+    groups -- modifies the objects in-place. Assumes each system
+    has at least one MuNG in its group.
+    """
+    system_mungs = []
+    _current_objid = start_objid
+    for sb, smg in zip(system_boundaries, system_mungo_groups):
+        m = smg[0]
+        uid = CropObject.build_uid(m.dataset,
+                                   m.doc,
+                                   _current_objid)
+        t, l, b, r = CropObject.bbox_to_integer_bounds(*sb)
+        h, w, = b - t, r - l
+        mask = numpy.ones((h, w))
+        system_mung = CropObject(objid=_current_objid,
+                                 clsname='staff',
+                                 top=t, left=l, height=h, width=w,
+                                 mask=mask,
+                                 uid=uid,
+                                 data=dict())
+        system_mungs.append(system_mung)
+
+        _current_objid += 1
+
+        for m in smg:
+            link_cropobjects(m, system_mung, check_docname=False)
+
+    return system_mungs

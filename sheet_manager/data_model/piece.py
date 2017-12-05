@@ -279,6 +279,15 @@ class Piece(object):
 
         return metadata
 
+    def clear(self):
+        """Removes all scores, performacnes, and non-authority
+        encodings. Use this very carefully!"""
+        self.clear_performances()
+        self.clear_scores()
+        for e in self.encodings:
+            if e != self.authority_format:
+                os.unlink(self.encodings[e])
+
     def clear_performances(self):
         """Remove all performances. Use this carefully!"""
         self.update()

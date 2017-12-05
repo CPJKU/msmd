@@ -54,9 +54,9 @@ import numpy as np
 
 # set backend to qt
 import matplotlib
-from muscima.io import export_cropobject_list
-
-from sheet_manager.alignments import mung_midi_from_ly_links, group_mungos_by_system
+from muscima.io import export_cropobject_list, parse_cropobject_list
+from sheet_manager.alignments import mung_midi_from_ly_links, group_mungos_by_system, build_system_mungos_on_page, \
+    align_score_to_performance
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
 
@@ -71,8 +71,7 @@ from utils import sort_by_roi, natsort, get_target_shape
 from pdf_parser import pdf2coords, parse_pdf
 from colormaps import cmaps
 
-from midi_parser import MidiParser
-
+from midi_parser import MidiParser, notes_to_onsets, FPS
 from omr.config.settings import DATA_ROOT as ROOT_DIR
 from omr.utils.data import MOZART_PIECES, BACH_PIECES, HAYDN_PIECES, BEETHOVEN_PIECES, CHOPIN_PIECES, SCHUBERT_PIECES, STRAUSS_PIECES
 PIECES = MOZART_PIECES + BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES + STRAUSS_PIECES
@@ -198,6 +197,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.page_systems = None
         self.page_rois = None
         self.page_bars = None
+        self.page_mungos = None
 
         # Current score properties
         self.score_name = None
@@ -215,6 +215,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.midi_matrix = None
         self.spec = None
         self.onsets = None
+        self.note_events = None
+
+        self._page_mungo_centroids = None
+        self._page_centroids2mungo_map = None
+
+        self.score_performance_alignment = None
+        # Dict: objid --> event_idx
 
     def open_sheet(self):
         """Choose a piece directory to open through a dialog window.
@@ -590,6 +597,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             return
 
         self.load_sheet()
+
         n_pages = len(self.page_coords)
         if n_pages == 0:
             self.status_label.setText("Extracting coords from pdf failed: could not find sheet!")
@@ -615,7 +623,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # Derive no. of pages from centroids
         for page_id in centroids:
-            print('Page {0}: {1} note events found'.format(page_id, centroids[page_id].shape[0]))
+            print('Page {0}: {1} note events found'
+                  ''.format(page_id, centroids[page_id].shape[0]))
             self.page_coords[page_id] = centroids[page_id]
 
         # Save the coordinates
@@ -631,33 +640,55 @@ class SheetManager(QtGui.QMainWindow, form_class):
         mungos = {page: mung_midi_from_ly_links(mungos[page])
                   for page in mungos}
 
-        # Save MuNG
-        mung_strings = {page: export_cropobject_list(mungos[page])
-                        for page in mungos}
-        self.current_score.add_paged_view('mung', mung_strings,
-                                          file_fmt='xml',
-                                          binary=False,
-                                          prefix=None,
-                                          overwrite=True)
+        system_bboxes = {}
+        system_mungo_groups = {}
+        _system_start_objid = max([max([m.objid for m in ms])
+                                   for ms in mungos.values()]) + 1
+        print('System objids will start from: {0}'.format(_system_start_objid))
+        for i, page in enumerate(mungos.keys()):
+            page_system_bboxes, page_system_mungo_groups = \
+                group_mungos_by_system(mungos[page],
+                    #score_img=self.sheet_pages[i],
+                    #page_num=i+1
+                )
+            system_bboxes[page] = page_system_bboxes
+            system_mungo_groups[page] = page_system_mungo_groups
 
-        # Extract system estimate from MuNG objects and pitches
-        system_bboxes = {page: group_mungos_by_system(
-            mungos[page],
-            score_img=self.sheet_pages[i])[0]
-                         for i, page in enumerate(mungos.keys())}
-        self.page_systems = {}
+            # Build the MuNG objects for systems and link
+            # the others.
+            system_mungos = build_system_mungos_on_page(
+                page_system_bboxes,
+                page_system_mungo_groups,
+                start_objid=_system_start_objid
+            )
+            _system_start_objid = max([sm.objid for sm in system_mungos]) + 1
+
+            combined_mungos = mungos[page] + system_mungos
+            mungos[page] = combined_mungos
+
+        self.page_systems = [[] for _ in range(n_pages)]
         for page, bboxes in system_bboxes.items():
             corners = []
             print('Page {0}: system bboxes = {1}'.format(page, bboxes))
             for t, l, b, r in bboxes:
                 corners.append([[t, l], [t, r], [b, r], [b, l]])
             corners_np = np.asarray(corners)
+            print('Corners shape: {0}'.format(corners_np.shape))
             self.page_systems[page] = corners_np
 
         # Save systems & refresh
         self.save_system_coords()
         self.sort_note_coords()
         self.update_sheet_statistics()
+
+        # Save MuNG
+        mung_strings = {page: export_cropobject_list(mungos[page])
+                        for page in range(len(mungos))}
+        self.current_score.add_paged_view('mung', mung_strings,
+                                          file_fmt='xml',
+                                          binary=False,
+                                          prefix=None,
+                                          overwrite=True)
 
         if self.checkBox_showExtractedCoords.isChecked():
             # Maybe we already have the ROIs for this image.
@@ -792,7 +823,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 continue
 
             midi_parser = MidiParser(show=self.checkBox_showSpec.isChecked())
-            spectrogram, onsets, midi_matrix = midi_parser.process(
+            spectrogram, onsets, midi_matrix, note_events = midi_parser.process(
                 midi_file_path,
                 audio_file_path,
                 return_midi_matrix=True)
@@ -800,11 +831,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
             performance.add_feature(spectrogram, 'spec.npy', overwrite=True)
             performance.add_feature(onsets, 'onsets.npy', overwrite=True)
             performance.add_feature(midi_matrix, 'midi.npy', overwrite=True)
+            performance.add_feature(note_events, 'notes.npy', overwrite=True)
 
             self.onsets = onsets
             self.midi_matrix = midi_matrix
             self.spec = spectrogram
-        #
+            self.note_events = note_events
+
         # pattern = self.folder_name + "/audio/*.mid*"
         # for midi_file_path in glob.glob(pattern):
         #     print("Processing", midi_file_path)
@@ -877,6 +910,16 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                                   e.message))
             return
         self.spec = spectrogram
+
+        try:
+            notes = self.current_performance.load_note_events()
+        except SheetManagerDBError as e:
+            logging.warning('Loading note events from current performance {0}'
+                            ' failed: {1}'.format(self.current_performance.name,
+                                                  e.message))
+            return
+        self.note_events = notes
+
 
         # set number of onsets in gui
         self.lineEdit_nOnsets.setText(str(len(self.onsets)))
@@ -1003,7 +1046,40 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # Loads the coordinates, if there are any stored
         self.load_coords()
 
+        # Load MuNG objects, if there are any
+        if 'mung' in self.current_score.views:
+            self.load_mung()
+
         self.status_label.setText("done!")
+
+    def load_mung(self):
+        """ Loads the Notation Graph representation. """
+        if 'mung' not in self.current_score.views:
+            print('Loading MuNG failed: notation graph not available!')
+            return
+
+        mung_files = self.current_score.view_files('mung')
+
+        page_mungos = [parse_cropobject_list(mf) for mf in mung_files]
+        self.page_mungos = page_mungos
+
+        # Serves as an interface between positions in the image
+        # and the MuNG objects.
+        self._page_centroids2mungo_map = []
+        self._page_mungo_centroids = []
+        for mungos in self.page_mungos:
+            mungo_centroids = [((m.top + m.bottom) / 2., (m.left + m.right) / 2)
+                               for m in mungos]
+            mungo_centroids_map = {c: m for c, m in zip(mungo_centroids,
+                                                        mungos)}
+            self._page_centroids2mungo_map.append(mungo_centroids_map)
+            self._page_mungo_centroids.append(np.asarray(mungo_centroids))
+
+        print('Page mungo centroids map sizes per page: {0}'
+              ''.format([len(self._page_centroids2mungo_map[i])
+                         for i in range(len(self.page_mungos))]))
+
+        self.update_mung_alignment()
 
     def load_coords(self):
         """ Load coordinates """
@@ -1090,6 +1166,33 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 bottomRight = [r_max, width]
                 self.page_rois[i].append(np.asarray([topLeft, topRight, bottomRight, bottomLeft]))
 
+    def update_mung_alignment(self):
+
+        print('Updating MuNG alignment...')
+        if self.page_mungos is None:
+            print('...no MuNG loaded!')
+            return None
+        aln = align_score_to_performance(self.current_score,
+                                         self.current_performance)
+        print('Total aligned pairs: {0}'.format(len(aln)))
+        self.score_performance_alignment = {
+            objid: note_idx
+            for objid, note_idx in aln}
+
+        self.load_performance_features()
+
+        _perf_name = self.current_performance.name
+        for i, mungos in enumerate(self.page_mungos):
+            for m in mungos:
+                if m.objid not in self.score_performance_alignment:
+                    continue
+                e = self.note_events[self.score_performance_alignment[m.objid]]
+                onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
+                m.data['{0}_onset_seconds'.format(_perf_name)] = e[0]
+                m.data['{0}_onset_frame'.format(_perf_name)] = int(onset_frame)
+
+        self.save_mung()
+
     def sort_note_coords(self):
         """ Sort note coordinates by systems (ROIs).
 
@@ -1097,7 +1200,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         with any system. However, if there are no systems for a given page,
         it just returns the coords in the original order.
         """
-        
+
         for page_id in xrange(self.n_pages):
             page_rois = self.page_rois[page_id]
 
@@ -1161,6 +1264,18 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.save_system_coords()
         self.save_bar_coords()
         self.save_note_coords()
+
+        self.save_mung()
+
+    def save_mung(self):
+        """Save the current MuNG data."""
+        mung_strings = {page: export_cropobject_list(self.page_mungos[page])
+                        for page in range(len(self.page_mungos))}
+        self.current_score.add_paged_view('mung', mung_strings,
+                                          file_fmt='xml',
+                                          binary=False,
+                                          prefix=None,
+                                          overwrite=True)
 
     def save_note_coords(self):
         """ Save current note coordinates. """
@@ -1257,6 +1372,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # plot note coordinates
         if self.checkBox_showCoords.isChecked():
             plt.plot(self.page_coords[page_id][:, 1], self.page_coords[page_id][:, 0], 'co', alpha=0.6)
+            if self._page_mungo_centroids is not None:
+                mcentroids = self._page_mungo_centroids[page_id]
+                plt.plot(mcentroids[:, 1], mcentroids[:, 0], 'yo', alpha=0.6)
 
         # plot systems
         if self.checkBox_showSystems.isChecked():
@@ -1412,8 +1530,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # position of click
         clicked = np.asarray([event.ydata, event.xdata]).reshape([1, 2])
 
-        #
-
         # right click (open spectrogram and highlight note's onset)
         # Note: this has a conflict with the usage of right-click to zoom out.
         # That was not apparent until we started playing around with retaining the zoom.
@@ -1426,17 +1542,50 @@ class SheetManager(QtGui.QMainWindow, form_class):
             # plot spectrogram
             plt.subplot(2, 1, 1)
             plt.imshow(self.spec, aspect='auto', origin='lower', cmap=cmaps['viridis'], interpolation='nearest')
+
+            # If possible, retrieve a MuNG note object...
+            onset = None
+            pitch = None
+            _aln_onset = None
+            _aln_pitch = None
+            mung_onset_successful = True
+            if self._page_mungo_centroids is not None:
+                centroids = sorted(self._page_centroids2mungo_map[page_id].keys())
+                dists = pairwise_distances(clicked,
+                                           centroids)
+                selection = np.argmin(dists)
+                centroid = centroids[selection]
+                mungo = self._page_centroids2mungo_map[page_id][centroid]
+
+                if 'midi_pitch_code' in mungo.data:
+                    pitch = int(mungo.data['midi_pitch_code'])
+
+                print('Found closest mungo: {0}'.format(mungo))
+                try:
+                    onset = self._mungo_onset_frame_for_current_performance(mungo)
+                    _aln_onset, _aln_pitch = self._aligned_onset_and_pitch(mungo)
+                except SheetManagerError:
+                    mung_onset_successful = False
+            else:
+                mung_onset_successful = False
+
+            # If not, fall back coords ordering.
+            if not mung_onset_successful:
+                print('...retrieving corresponding MuNG object not successful.')
+
+                dists = pairwise_distances(clicked, self.page_coords[page_id])
+                selection = np.argmin(dists)
+
+                if page_id > 0:
+                    offset = np.sum([len(self.page_coords[i]) for i in xrange(page_id)])
+                    selection += offset
             
-            dists = pairwise_distances(clicked, self.page_coords[page_id])
-            selection = np.argmin(dists)
-            
-            if page_id > 0:
-                offset = np.sum([len(self.page_coords[i]) for i in xrange(page_id)])
-                selection += offset
-            
-            onset = self.onsets[selection]
+                onset = self.onsets[selection]
+
+            print('Pitch: {0}, onset: {1}, aln_pitch: {2}'.format(pitch, onset, _aln_pitch))
+
             plt.plot([onset, onset], [0, self.spec.shape[0]], 'w-', linewidth=2.0, alpha=0.5)
-            
+
             x_min = np.max([0, onset - 100])
             x_max = x_min + 200
             plt.xlim([x_min, x_max])
@@ -1451,6 +1600,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 plt.imshow(np.max(self.midi_matrix) - self.midi_matrix, aspect='auto', cmap=plt.cm.gray, interpolation='nearest',
                            vmin=0, vmax=np.max(self.midi_matrix))
                 plt.plot([onset, onset], [0, self.midi_matrix.shape[0]], 'k-', linewidth=2.0, alpha=0.5)
+                if pitch is not None:
+                    plt.plot([onset], [pitch], 'ro', alpha=0.5)
+                if _aln_pitch is not None:
+                    plt.plot([onset], [_aln_pitch], 'bo', alpha=0.5)
                 plt.ylim([0, self.midi_matrix.shape[0]])
                 plt.xlim([x_min, x_max])
                 plt.ylabel("%d Midi Pitches" % self.midi_matrix.shape[0])
@@ -1720,6 +1873,40 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.status_label.setText("done!")
 
+    def _mungo_onset_frame_for_current_performance(self, mungo):
+        """Helper method."""
+        perf_attr_string = '{0}_onset_frame' \
+                           ''.format(self.current_performance.name)
+        if perf_attr_string not in mungo.data:
+            raise SheetManagerError('Cannot get onset frame from MuNG'
+                                    ' object {0}: data attribute {1} is'
+                                    ' missing!'.format(mungo.objid,
+                                                       perf_attr_string))
+        return mungo.data[perf_attr_string]
+
+    def _aligned_onset_and_pitch(self, mungo):
+        """Retrieves the onset frame and pitch for the MIDI note event
+        to which the given MuNG object is aligned. If the object is not
+        aligned to anything, returns ``(None, None)``."""
+        if self.score_performance_alignment is None:
+            return None, None
+        objid = mungo.objid
+        if objid not in self.score_performance_alignment:
+            return None, None
+        event_idx = self.score_performance_alignment[objid]
+        if self.note_events is None:
+            return None, None
+        if event_idx > self.note_events.shape[0]:
+            logging.warn('Note event with number higher than no. of available'
+                         ' events...? Event idx {0}, total {1}'
+                         ''.format(event_idx, self.note_events.shape[0]))
+            return None, None
+
+        event = self.note_events[event_idx]
+        onset = notes_to_onsets([event], 1.0 / FPS)
+        pitch = int(event[1])
+
+        return onset, pitch
 
 ##############################################################################
 
@@ -1728,6 +1915,9 @@ def build_argument_parser():
     parser = argparse.ArgumentParser(description=__doc__, add_help=True,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
 
+    parser.add_argument('-i', '--interactive', action='store_true',
+                        help='If set, will always launch interactive mode'
+                             ' regardless of other arguments.')
     parser.add_argument('-d', '--data_dir', default=None,
                         help='[CLI] This is the root data directory. The piece'
                              ' dirs should be directly in this one. If running'
@@ -1756,7 +1946,7 @@ def build_argument_parser():
     return parser
 
 
-def launch_gui():
+def launch_gui(args):
     """Launches the GUI."""
     if args.verbose:
         logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
@@ -1765,6 +1955,11 @@ def launch_gui():
 
     app = QtGui.QApplication(sys.argv)
     myWindow = SheetManager()
+    if args.data_dir:
+        if len(args.pieces) > 0:
+            piece = args.pieces[0]
+            piece_dir = os.path.join(args.data_dir, piece)
+            myWindow.load_piece(piece_dir)
     myWindow.show()
     app.exec_()
 
@@ -1818,13 +2013,17 @@ def run_batch_mode(args):
 
 
 def _requested_interactive(args):
-    return args.data_dir is None
+    if args.interactive:
+        return True
+    if args.data_dir is None:
+        return True
+    return False
 
 
 def main(args):
 
     if _requested_interactive(args):
-        launch_gui()
+        launch_gui(args)
 
     else:
         run_batch_mode(args)

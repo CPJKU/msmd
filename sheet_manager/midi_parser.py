@@ -120,7 +120,9 @@ class MidiParser(object):
             # m = mm_midi.MIDIFile.from_file(mfile)
             m = mm_midi.MIDIFile.from_file(midi_file_path)
             # print midi_file_path, m.notes()
-            notes = m.notes()
+
+            # Order notes by onset and top-down in simultaneities
+            notes = np.asarray(sorted(m.notes(), key=lambda n: (n[0], n[1] * -1)))
             onsets = notes_to_onsets(notes, dt=1.0 / FPS)
             midi_matrix = notes_to_matrix(notes, dt=1.0 / FPS)
 
@@ -136,7 +138,7 @@ class MidiParser(object):
             plt.show(block=True)
 
         if return_midi_matrix:
-            return Spec, onsets, midi_matrix
+            return Spec, onsets, midi_matrix, notes
         else:
             return Spec, onsets
 

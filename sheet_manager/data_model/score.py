@@ -1,11 +1,16 @@
 """This module implements a class that represents a score of a piece."""
 from __future__ import print_function
 
+import collections
 import logging
 import os
+import pprint
 import shutil
 import time
 import yaml
+from muscima.graph import NotationGraph
+from muscima.inference_engine_constants import InferenceEngineConstants
+from muscima.io import parse_cropobject_list
 
 from sheet_manager.data_model.util import SheetManagerDBError, path2name
 
@@ -180,7 +185,7 @@ class Score(object):
                                       ' not available!'
                                       ''.format(self.name, view_name))
         view_dir = self.views[view_name]
-        return [os.path.join(view_dir, f) for f in os.listdir(view_dir)
+        return [os.path.join(view_dir, f) for f in sorted(os.listdir(view_dir))
                 if (not f.startswith('.')) and
                    (os.path.isfile(os.path.join(view_dir, f)))]
 
@@ -222,3 +227,132 @@ class Score(object):
         if not os.path.isdir(self.coords_dir):
             os.mkdir(self.coords_dir)
 
+    def get_ordered_notes(self):
+        """Returns the MuNG objects corresponding to notes in the canonical
+        ordering: by page, system, left-to-right, and top-down within
+        simultaneities (e.g. chords)."""
+        self.update()
+        if 'mung' not in self.views:
+            raise SheetManagerDBError('Score {0}: mung view not available!'
+                                      ''.format(self.name))
+        mung_files = self.view_files('mung')
+
+        # Algorithm:
+        #  - Create hard ordering constraints:
+        #     - pages (already done: mungos_per_page)
+        #     - systems
+
+        notes_per_page = []
+
+        for f in mung_files:
+            mungos = parse_cropobject_list(f)
+            mgraph = NotationGraph(mungos)
+            _CONST = InferenceEngineConstants()
+
+            note_mungos = [c for c in mungos
+                           if 'midi_pitch_code' in c.data]
+            system_mungos = [c for c in mungos if c.clsname == 'staff']
+            system_mungos = sorted(system_mungos, key=lambda m: m.top)
+
+            notes_per_system = []
+
+            for s in system_mungos:
+                system_notes = mgraph.ancestors(s,
+                                                classes=_CONST.NOTEHEAD_CLSNAMES)
+                # print('Ancestors of system {0}: {1}'.format(s, system_notes))
+                # Process simultaneities. We use a very small overlap ratio,
+                # because we want to catch also chords that have noteheads
+                # on both sides of the stem. Sorted top-down.
+                system_note_columns = group_mungos_by_column(system_notes,
+                                                             MIN_OVERLAP_RATIO=0.05)
+                # print('System {0}: n_columns = {1}'
+                #       ''.format(s.objid, len(system_note_columns)))
+                ltr_sorted_columns = sorted(system_note_columns.items(),
+                                            key=lambda kv: kv[0])
+                # print('ltr_sorted_columns[0] = {0}'.format(ltr_sorted_columns[0]))
+                system_ordered_simultaneities = [c[1]
+                                                 for c in ltr_sorted_columns]
+                # print('system_ordered_sims[0] = {0}'.format(system_ordered_simultaneities[0]))
+
+                notes_per_system.append(system_ordered_simultaneities)
+
+            # print('Total entries in notes_per_system = {0}'.format(len(notes_per_system)))
+            notes_per_page.append(notes_per_system)
+
+
+        # Data structure
+        # --------------
+        # notes_per_page = [
+        #   notes_per_system_1 = [
+        #       ordered_simultaneities = [
+        #           simultaneity1 = [ a'', f'', c'', a' ],
+        #           simultaneity2 = [ g'', e'', c'', bes' ],
+        #           ...
+        #       ]
+        #   ],
+        #   notes_per_system_2 = [
+        #       simultaneity1 = [ ... ]
+        #       ...
+        #   ]
+        # ]
+
+        # Unroll simultaneities notes according to this data structure
+
+        ### DEBUG
+        # print('notes_per_page: {0}'.format(pprint.pformat(notes_per_page)))
+
+        ordered_simultaneities = []
+        for page in notes_per_page:
+            for system in page:
+                ordered_simultaneities.extend(system)
+
+        ordered_notes = []
+        for sim in ordered_simultaneities:
+            ordered_notes.extend(list(reversed(sim)))
+
+        # Remove all tied notes.
+        ordered_notes_no_ties = [m for m in ordered_notes]
+                                 # if ('tied' not in m.data)
+                                 # or (('tied' in m.data)
+                                 #     and (m.data['tied'] != 1))]
+        return ordered_notes_no_ties
+
+
+def group_mungos_by_column(page_mungos, MIN_OVERLAP_RATIO=0.5):
+    """Group symbols into columns.
+
+    Two symbols are put in one column if their overlap is at least
+    ``MIN_OVERLAP_RATIO`` of the left symbol.
+    """
+    _mdict = {m.objid: m for m in page_mungos}
+
+    mungos_by_left = collections.defaultdict(list)
+    for m in page_mungos:
+        mungos_by_left[m.left].append(m)
+    rightmost_per_column = {l: max([m.right for m in mungos_by_left[l]])
+                            for l in mungos_by_left}
+    mungo_to_leftmost = {m.objid: m.left for m in page_mungos}
+    # Go greedily from left, take all objects that
+    # overlap horizontally by half of the given column
+    # width.
+    lefts_sorted = sorted(mungos_by_left.keys())
+    for i, l in list(enumerate(lefts_sorted))[:-1]:
+        if mungos_by_left[l] is None:
+            continue
+        r = rightmost_per_column[l]
+        mid_point = l + (r - l) * (1 - MIN_OVERLAP_RATIO)
+        for l2 in lefts_sorted[i + 1:]:
+            if l2 >= mid_point:
+                break
+            for m in mungos_by_left[l2]:
+                mungo_to_leftmost[m.objid] = l
+            mungos_by_left[l2] = None
+    mungo_columns = collections.defaultdict(list)
+    for objid in mungo_to_leftmost:
+        l = mungo_to_leftmost[objid]
+        mungo_columns[l].append(_mdict[objid])
+
+    # ...sort the MuNG columns from top to bottom:
+    sorted_mungo_columns = {l: sorted(mungos, key=lambda x: x.top)
+                            for l, mungos in mungo_columns.items()}
+    return sorted_mungo_columns
