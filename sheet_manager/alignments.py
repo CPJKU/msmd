@@ -19,8 +19,13 @@ Algorithm
 from __future__ import print_function
 
 import collections
+import copy
+import logging
+import pprint
 
 import abjad
+import numpy
+from mhr.muscimarker_io import cropobjects_merge_bbox
 from muscima.io import parse_cropobject_list
 
 from sheet_manager.data_model.util import SheetManagerDBError
@@ -189,22 +194,233 @@ def align_score_to_performance(score, performance):
     raise NotImplementedError()
 
 
-def group_mungos_by_system(page_mungos):
+def group_mungos_by_system(page_mungos, score_img, MIN_PEAK_WIDTH=5):
     """Groups the MuNG objects on a page into systems. Assumes
     piano music: there is a system break whenever a pitch that
     overlaps horizontally and is lower on the page is higher
     than the previous pitch.
 
-    This method assumes no systems have been detected.
-    """
+    Only takes into account MuNG objects with
+    the ``midi_pitch_code`` in their ``data`` dict.
 
-    # Group symbols into columns.
-    #  -
+    This method assumes no systems have been detected.
+
+    :returns: ``(system_bboxes, system_mungos)`` where ``system_bboxes``
+        are ``(top, left, bottom, right)`` tuples denoting the suggested
+        system bounding boxes, and ``system_mungos`` is a list of MuNG
+        objects
+    """
+    if len(page_mungos) < 2:
+        logging.warning('Grouping MuNG objects by system'
+                        ' called with only {0} objects!'
+                        ''.format(len(page_mungos)))
+        return [page_mungos]
+
+    page_mungos = [m for m in page_mungos
+                   if 'midi_pitch_code' in m.data]
+
+    mungo_dict = {m.objid: m for m in page_mungos}
+
+    sorted_mungo_columns = group_mungos_by_column(mungo_dict, page_mungos)
+
+    print('Total MuNG object columns: {0}'
+          ''.format(len(sorted_mungo_columns)))
+    print('MuNG column lengths: {0}'
+          ''.format(numpy.asarray([len(col)
+                                for col in sorted_mungo_columns.values()])))
+
+    dividers = find_column_divider_regions(sorted_mungo_columns)
+
+    print('Dividers: {0}'.format(dividers))
+
+    # Now, we take the horizontal projection of the divider regions
+    canvas_height = max([m.bottom for m in page_mungos])
+    canvas_width = max([m.right for m in page_mungos])
+    canvas_size = canvas_height + 5, \
+                  canvas_width + 5
+    canvas = numpy.zeros(canvas_size, dtype='uint8')
+    for t, l, b, r in dividers:
+        canvas[t:b, l:r] += 1
+
+    ### DEBUG
+    import matplotlib
+    matplotlib.use('Qt4Agg')
+    import matplotlib.pyplot as plt
+    plt.imshow(score_img[:canvas_height, :canvas_width], cmap='gray')
+    plt.imshow(canvas[:canvas_height, :canvas_width], alpha=0.3)
+
+    canvas_hproj = canvas.sum(axis=1)
+    plt.plot(canvas_hproj, numpy.arange(canvas_hproj.shape[0]))
+    plt.show()
+
+    # Now we find local peaks (or peak areas) of the projections.
+    # - what is a peak? higher than previous, higher then next
+    #   unequal
+    peak_starts = []
+    peak_ends = []
+
+    peak_start_candidate = 0
+    ascending = False
+    for i in range(1, canvas_hproj.shape[0] - 1):
+        # If current is higher than previous:
+        #  - previous cannot be a peak.
+        if canvas_hproj[i] > canvas_hproj[i - 1]:
+            peak_start_candidate = i
+            ascending = True
+        # If current is higher than next:
+        #  - if we are in an ascending stage: ascent ends, found peak
+        if canvas_hproj[i] > canvas_hproj[i + 1]:
+            if not ascending:
+                continue
+            peak_starts.append(peak_start_candidate)
+            peak_ends.append(i)
+            ascending = False
+
+    print('Peaks: {0}'.format(zip(peak_starts, peak_ends)))
+    # Filter out very sharp peaks
+    peak_starts, peak_ends = map(list, zip(*[(s, e) for s, e in zip(peak_starts, peak_ends)
+                                   if (e - s) > MIN_PEAK_WIDTH]))
+
+    # Use peaks as separators between system regions.
+    system_regions = []
+    for s, e in zip([0] + peak_ends, peak_starts + [canvas_height]):
+        region = (s+1, 1, e, canvas_width)
+        system_regions.append(region)
+
+    print('System regions:\n{0}'.format([(t, b) for t, l, b, r in system_regions]))
+
+    system_mungos = group_mungos_by_region(page_mungos, system_regions)
+
+    # Crop system boundaries based on mungos
+    # (includes filtering out systems that have no objects)
+    cropped_system_boundaries = []
+    cropped_system_mungos = []
+    for mungos in system_mungos:
+        if len(mungos) == 0:
+            continue
+        t, l, b, r = cropobjects_merge_bbox(mungos)
+        cropped_system_boundaries.append((t, l, b, r))
+        cropped_system_mungos.append(mungos)
+
+    # Merge vertically overlapping system regions
+    sorted_system_boundaries = sorted(cropped_system_boundaries, key=lambda x: x[0])
+    merge_sets = []
+    current_merge_set = [0]
+    for i in range(len(sorted_system_boundaries[:-1])):
+        t, l, b, r = sorted_system_boundaries[i]
+        nt, nl, nb, nr = sorted_system_boundaries[i+1]
+        if nt <= b:
+            current_merge_set.append(i + 1)
+        else:
+            merge_sets.append(copy.deepcopy(current_merge_set))
+            current_merge_set = [i+1]
+    merge_sets.append(copy.deepcopy(current_merge_set))
+
+    print('Merge sets: {0}'.format(merge_sets))
+
+    merged_system_boundaries = []
+    for ms in merge_sets:
+        regions = [sorted_system_boundaries[i] for i in ms]
+        if len(regions) == 1:
+            print('No overlap for merge set {0}, just adding it'.format(regions))
+            merged_system_boundaries.append(regions[0])
+            continue
+        mt = min([r[0] for r in regions])
+        ml = min([r[1] for r in regions])
+        mb = max([r[2] for r in regions])
+        mr = max([r[3] for r in regions])
+        merged_system_boundaries.append((mt, ml, mb, mr))
+        print('Merging overlapping systems: ms {0}, regions {1}, boundary: {2}'
+              ''.format(ms, regions, (mt, ml, mb, mr)))
+    merged_system_mungos = group_mungos_by_region(page_mungos, merged_system_boundaries)
+
+    return merged_system_boundaries, merged_system_mungos
+
+
+def group_mungos_by_region(page_mungos, system_regions):
+    """Group MuNG objects based on which system they belong to."""
+    system_mungos = [[] for _ in system_regions]
+    for i, (t, l, b, r) in enumerate(system_regions):
+        for m in page_mungos:
+            if (t <= m.top <= b) and (l <= m.left <= r):
+                system_mungos[i].append(m)
+
+    return system_mungos
+
+
+def find_column_divider_regions(sorted_mungo_columns):
+    """Within each MuNG note column, use the MIDI pitch code data
+    attribute to find suspected system breaks."""
+    rightmost_per_column = {l: max([m.right
+                                    for m in sorted_mungo_columns[l]])
+                            for l in sorted_mungo_columns}
+    # Now we have the MuNG objects grouped into columns.
+    # Next step: find system breaks in each column.
+    system_breaks_mungos_per_col = collections.defaultdict(list)
+    # Collects the pairs of MuNG objects in each column between
+    # which a page break is suspected.
+    for l in sorted_mungo_columns:
+        m_col = sorted_mungo_columns[l]
+        system_breaks_mungos_per_col[l] = []
+        if len(m_col) < 2:
+            continue
+        for m1, m2 in zip(m_col[:-1], m_col[1:]):
+            print('Col {0}: comparing pitches {1}, {2}'
+                  ''.format(l, m1.data['midi_pitch_code'], m2.data['midi_pitch_code']))
+            # Noteheads very close togehter in a column..?
+            if (m2.top - m1.top) < m1.height:
+                continue
+            if m1.data['midi_pitch_code'] < m2.data['midi_pitch_code']:
+                system_breaks_mungos_per_col[l].append((m1, m2))
+    print('System breaks: {0}'
+          ''.format(pprint.pformat(dict(system_breaks_mungos_per_col))))
+    # We can now draw dividing regions where we are certain
+    # a page brerak should occur.
+    dividers = []
+    for l in system_breaks_mungos_per_col:
+        r = rightmost_per_column[l]
+        for m1, m2 in system_breaks_mungos_per_col[l]:
+            t = m1.bottom + 1
+            b = m2.top
+            dividers.append((t, l, b, r))
+    return dividers
+
+
+def group_mungos_by_column(mungo_dict, page_mungos):
+    """Group symbols into columns."""
     mungos_by_left = collections.defaultdict(list)
     for m in page_mungos:
         mungos_by_left[m.left].append(m)
-    rightmost_per_column = {l : max([m.right for m in mungos_by_left[l]])
+    rightmost_per_column = {l: max([m.right for m in mungos_by_left[l]])
                             for l in mungos_by_left}
+    mungo_to_leftmost = {m.objid: m.left for m in page_mungos}
+    # Go greedily from left, take all objects that
+    # overlap horizontally by half of the given column
+    # width.
+    lefts_sorted = sorted(mungos_by_left.keys())
+    for i, l in list(enumerate(lefts_sorted))[:-1]:
+        if mungos_by_left[l] is None:
+            continue
+        r = rightmost_per_column[l]
+        mid_point = (l + r) / 2.
+        for l2 in lefts_sorted[i + 1:]:
+            if l2 >= mid_point:
+                break
+            for m in mungos_by_left[l2]:
+                mungo_to_leftmost[m.objid] = l
+            mungos_by_left[l2] = None
+    mungo_columns = collections.defaultdict(list)
+    for objid in mungo_to_leftmost:
+        l = mungo_to_leftmost[objid]
+        mungo_columns[l].append(mungo_dict[objid])
 
-    for l in sorted(mungos_by_left.keys()):
-        pass
+    # ...sort the MuNG columns from top to bottom:
+    sorted_mungo_columns = {l: sorted(mungos, key=lambda x: x.top)
+                            for l, mungos in mungo_columns.items()}
+    return sorted_mungo_columns
+
+
+def build_system_mungos(system_boundaries, system_mungos):
+    """Creates the ``staff`` MuNG objects from the given system
+    boudnaries."""
+    pass

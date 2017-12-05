@@ -672,7 +672,7 @@
               <number>1000</number>
              </property>
              <property name="value">
-              <number>30</number>
+              <number>5</number>
              </property>
             </widget>
            </item>
@@ -682,7 +682,7 @@
               <number>1000</number>
              </property>
              <property name="value">
-              <number>30</number>
+              <number>5</number>
              </property>
             </widget>
            </item>

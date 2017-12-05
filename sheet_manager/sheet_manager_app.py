@@ -56,7 +56,7 @@ import numpy as np
 import matplotlib
 from muscima.io import export_cropobject_list
 
-from sheet_manager.alignments import mung_midi_from_ly_links
+from sheet_manager.alignments import mung_midi_from_ly_links, group_mungos_by_system
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
 
@@ -599,11 +599,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
             return
 
         # Run PDF coordinate extraction
-        centroids, bboxes, cropobjects = parse_pdf(self.pdf_file,
-                                                   target_width=self.target_width,
-                                                   with_links=True,
-                                                   collection_name=os.path.basename(self.piece.collection_root),
-                                                   score_name=self.current_score.name)
+        centroids, bboxes, mungos = parse_pdf(self.pdf_file,
+                                              target_width=self.target_width,
+                                              with_links=True,
+                                              collection_name=os.path.basename(self.piece.collection_root),
+                                              score_name=self.current_score.name)
         # centroids = pdf2coords(self.pdf_file, target_width=self.target_width)
 
         # Check that the PDF corresponds to the generated images...
@@ -628,17 +628,33 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.update_sheet_statistics()
 
         # Add MuNG MIDI pitch codes
-        cropobjects = {page: mung_midi_from_ly_links(cropobjects[page])
-                       for page in cropobjects}
+        mungos = {page: mung_midi_from_ly_links(mungos[page])
+                  for page in mungos}
 
         # Save MuNG
-        cropobject_strings = {page: export_cropobject_list(cropobjects[page])
-                              for page in cropobjects}
-        self.current_score.add_paged_view('mung', cropobject_strings,
+        mung_strings = {page: export_cropobject_list(mungos[page])
+                        for page in mungos}
+        self.current_score.add_paged_view('mung', mung_strings,
                                           file_fmt='xml',
                                           binary=False,
                                           prefix=None,
                                           overwrite=True)
+
+        # Extract system estimate from MuNG objects and pitches
+        system_bboxes = {page: group_mungos_by_system(
+            mungos[page],
+            score_img=self.sheet_pages[i])[0]
+                         for i, page in enumerate(mungos.keys())}
+        self.page_systems = {}
+        for page, bboxes in system_bboxes.items():
+            corners = []
+            print('Page {0}: system bboxes = {1}'.format(page, bboxes))
+            for t, l, b, r in bboxes:
+                corners.append([[t, l], [t, r], [b, r], [b, l]])
+            corners_np = np.asarray(corners)
+            self.page_systems[page] = corners_np
+
+        self.save_system_coords()
 
         if self.checkBox_showExtractedCoords.isChecked():
             # Maybe we already have the ROIs for this image.
