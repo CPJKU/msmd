@@ -99,3 +99,14 @@ def natsort(l):
     else:
         return l
 
+
+def greater_than_zero_intervals(a):
+    """Find nonzero interval bounds on array ``a``.
+
+    ``stackoverflow.com/questions/28777795/quickly-find-non-zero-intervals``
+
+    """
+    isntzero = np.concatenate(([0], np.greater(a, 0).view(np.int8), [0]))
+    absdiff = np.abs(np.diff(isntzero))
+    ranges = np.where(absdiff == 1)[0].reshape(-1, 2)
+    return ranges

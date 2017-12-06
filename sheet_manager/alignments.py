@@ -34,6 +34,7 @@ from muscima.io import parse_cropobject_list
 from sheet_manager.data_model.score import group_mungos_by_column
 from sheet_manager.data_model.util import SheetManagerDBError
 from sheet_manager.midi_parser import notes_to_onsets, FPS
+from sheet_manager.utils import greater_than_zero_intervals
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
@@ -395,9 +396,32 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_
     for t, l, b, r in dividers:
         canvas[t:b, l:r] += 1
 
-    canvas_hproj = canvas.sum(axis=1)
+    dividers_hproj = canvas.sum(axis=1)
+
+    allowed_peaks_hproj = numpy.ones_like(dividers_hproj)
+
+    if score_img is not None:
+        # Get image horizontal projections, restrict
+        # peaks to areas where the image hproj. is maximal
+        import cv2
+        if score_img.ndim == 3:
+            img = numpy.average(score_img, axis=0)
+        else:
+            img = score_img
+        blur = cv2.GaussianBlur(img, ksize=(5, 5), sigmaX=2.0, sigmaY=2.0)
+        _, img_binarized = cv2.threshold(blur, 0, blur.max(),
+                                         cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+        img_hproj = img_binarized.sum(axis=1)[:dividers_hproj.shape[0]]
+        img_hproj_norm = img_hproj / img_binarized.max()
+        max_img_hproj = max(img_hproj_norm)
+        _tolerance = 0.02
+        print('Allowed peaks threshold: {0}, with maximum {1}'
+              ''.format(max_img_hproj * (1 - _tolerance), max_img_hproj))
+        allowed_peaks_hproj = img_hproj_norm >= (max_img_hproj * (1 - _tolerance))
+
 
     ### DEBUG
+    # or very close to maximal.
     if (score_img is not None) and (page_num is not None):
         import matplotlib
         matplotlib.use('Qt4Agg')
@@ -406,7 +430,9 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_
         plt.imshow(score_img[:canvas_height, :canvas_width], cmap='gray')
         plt.imshow(canvas[:canvas_height, :canvas_width], alpha=0.3)
 
-        plt.plot(canvas_hproj, numpy.arange(canvas_hproj.shape[0]))
+        plt.plot(dividers_hproj, numpy.arange(dividers_hproj.shape[0]))
+        if allowed_peaks_hproj is not None:
+            plt.plot(allowed_peaks_hproj, numpy.arange(dividers_hproj.shape[0]))
         plt.show()
 
     # Now we find local peaks (or peak areas) of the projections.
@@ -417,15 +443,15 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_
 
     peak_start_candidate = 0
     ascending = False
-    for i in range(1, canvas_hproj.shape[0] - 1):
+    for i in range(1, dividers_hproj.shape[0] - 1):
         # If current is higher than previous:
         #  - previous cannot be a peak.
-        if canvas_hproj[i] > canvas_hproj[i - 1]:
+        if dividers_hproj[i] > dividers_hproj[i - 1]:
             peak_start_candidate = i
             ascending = True
         # If current is higher than next:
         #  - if we are in an ascending stage: ascent ends, found peak
-        if canvas_hproj[i] > canvas_hproj[i + 1]:
+        if dividers_hproj[i] > dividers_hproj[i + 1]:
             if not ascending:
                 continue
             peak_starts.append(peak_start_candidate)
@@ -434,8 +460,20 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_
 
     logging.debug('Peaks: {0}'.format(zip(peak_starts, peak_ends)))
     # Filter out very sharp peaks
-    peak_starts, peak_ends = map(list, zip(*[(s, e) for s, e in zip(peak_starts, peak_ends)
+    peak_starts, peak_ends = map(list, zip(*[(s, e)
+                                             for s, e in zip(peak_starts, peak_ends)
                                    if (e - s) > MIN_PEAK_WIDTH]))
+
+    # Factor in the allowed peaks projection
+    peak_proj = numpy.zeros_like(allowed_peaks_hproj)
+    for s, e in zip(peak_starts, peak_ends):
+        peak_proj[s:e] = 1
+    logging.debug('Peak projection: {0} nonzero rows'.format(peak_proj.sum()))
+    peak_proj *= allowed_peaks_hproj
+    logging.debug('After applying allowed peaks: {0} nonzero rows'.format(peak_proj.sum()))
+    logging.debug('Allowed peak locations: {0}'.format(allowed_peaks_hproj.sum()))
+    peaks = greater_than_zero_intervals(peak_proj)
+    peak_starts, peak_ends = map(list, zip(*peaks))
 
     # Use peaks as separators between system regions.
     system_regions = []
@@ -498,6 +536,8 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_
 def group_mungos_by_region(page_mungos, system_regions):
     """Group MuNG objects based on which system they belong to."""
     system_mungos = [[] for _ in system_regions]
+    # TODO
+    # For each MuNG object, find the closest region
     for i, (t, l, b, r) in enumerate(system_regions):
         for m in page_mungos:
             if m.overlaps((t, l, b, r)):

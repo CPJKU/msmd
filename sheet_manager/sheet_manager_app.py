@@ -647,9 +647,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
         print('System objids will start from: {0}'.format(_system_start_objid))
         for i, page in enumerate(mungos.keys()):
             page_system_bboxes, page_system_mungo_groups = \
-                group_mungos_by_system(mungos[page],
-                    #score_img=self.sheet_pages[i],
-                    #page_num=i+1
+                group_mungos_by_system(
+                    page_mungos=mungos[page],
+                    score_img=self.sheet_pages[i],
+                    # page_num=i+1
                 )
             system_bboxes[page] = page_system_bboxes
             system_mungo_groups[page] = page_system_mungo_groups
