@@ -227,7 +227,7 @@ class Score(object):
         if not os.path.isdir(self.coords_dir):
             os.mkdir(self.coords_dir)
 
-    def get_ordered_notes(self):
+    def get_ordered_notes(self, filter_tied=False):
         """Returns the MuNG objects corresponding to notes in the canonical
         ordering: by page, system, left-to-right, and top-down within
         simultaneities (e.g. chords)."""
@@ -311,11 +311,12 @@ class Score(object):
             ordered_notes.extend(list(reversed(sim)))
 
         # Remove all tied notes.
-        ordered_notes_no_ties = [m for m in ordered_notes]
-                                 # if ('tied' not in m.data)
-                                 # or (('tied' in m.data)
-                                 #     and (m.data['tied'] != 1))]
-        return ordered_notes_no_ties
+        if filter_tied:
+            ordered_notes = [m for m in ordered_notes
+                             if ('tied' not in m.data)
+                             or (('tied' in m.data) and (m.data['tied'] != 1))
+                             ]
+        return ordered_notes
 
 
 def group_mungos_by_column(page_mungos, MIN_OVERLAP_RATIO=0.5):

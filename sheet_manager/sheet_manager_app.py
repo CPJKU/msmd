@@ -1603,7 +1603,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 if pitch is not None:
                     plt.plot([onset], [pitch], 'ro', alpha=0.5)
                 if _aln_pitch is not None:
-                    plt.plot([onset], [_aln_pitch], 'bo', alpha=0.5)
+                    plt.plot([_aln_onset], [_aln_pitch], 'bo', alpha=0.5)
                 plt.ylim([0, self.midi_matrix.shape[0]])
                 plt.xlim([x_min, x_max])
                 plt.ylabel("%d Midi Pitches" % self.midi_matrix.shape[0])
@@ -1922,7 +1922,7 @@ def build_argument_parser():
                         help='[CLI] This is the root data directory. The piece'
                              ' dirs should be directly in this one. If running'
                              ' Sheet Manager in batch mode, this argument is'
-                             ' required; if it is not give, GUI is launched.')
+                             ' required; if it is not given, GUI is launched.')
     parser.add_argument('-p', '--pieces', nargs='+',
                         help='[CLI] The pieces which should be processed. ')
     parser.add_argument('-a', '--all', action='store_true',

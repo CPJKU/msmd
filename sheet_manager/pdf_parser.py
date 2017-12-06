@@ -1,6 +1,7 @@
 """This module implements a class that..."""
 from __future__ import print_function
 
+import logging
 import re
 import sys
 
@@ -156,7 +157,7 @@ def parse_pdf(fname, target_width=None, with_links=False,
                 uid = CropObject.build_uid(collection_name,
                                            score_name + '-P{0:02d}'.format(page_no),
                                            _current_objid)
-                print('Creating CropObject with uid {0}'.format(uid))
+                logging.debug('Creating CropObject with uid {0}'.format(uid))
                 data = {'ly_link': link_txt}
                 cropobject = CropObject(objid=_current_objid,
                                         clsname='notehead-full',

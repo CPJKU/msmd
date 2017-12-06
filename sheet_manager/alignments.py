@@ -317,7 +317,7 @@ def align_score_to_performance(score, performance):
         Note that (a) not all MIDI matrix onsets have a corresponding visual
         object, (b) not all noteheads have a corresponding onset (ties!).
     """
-    ordered_mungos = score.get_ordered_notes()
+    ordered_mungos = score.get_ordered_notes(filter_tied=True)
 
     #  - Unroll MIDI matrix (onsets left to right, simultaneous pitches top-down).
     note_events = performance.load_note_events()
@@ -334,8 +334,11 @@ def align_score_to_performance(score, performance):
         pitch_e = int(e[1])
 
         if pitch_m != pitch_e:
-            print('Pitch of MuNG object and corresponding MIDI note does not'
-                  ' match: MuNG {0}, event {1}'.format(pitch_m, pitch_e))
+            print('Pitch of MuNG object {0} and corresponding MIDI note {1}'
+                  ' with onset {2} does not'
+                  ' match: MuNG {3}, event {4}'.format(m.objid, note_event_idx,
+                                                       e[0],
+                                                       pitch_m, pitch_e))
 
         onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
         m.data['{0}_onset_seconds'.format(performance.name)] = e[0]
@@ -497,7 +500,7 @@ def group_mungos_by_region(page_mungos, system_regions):
     system_mungos = [[] for _ in system_regions]
     for i, (t, l, b, r) in enumerate(system_regions):
         for m in page_mungos:
-            if (t <= m.top <= b) and (l <= m.left <= r):
+            if m.overlaps((t, l, b, r)):
                 system_mungos[i].append(m)
 
     return system_mungos
