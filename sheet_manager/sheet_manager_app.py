@@ -640,17 +640,23 @@ class SheetManager(QtGui.QMainWindow, form_class):
         mungos = {page: mung_midi_from_ly_links(mungos[page])
                   for page in mungos}
 
+
         system_bboxes = {}
         system_mungo_groups = {}
         _system_start_objid = max([max([m.objid for m in ms])
                                    for ms in mungos.values()]) + 1
         print('System objids will start from: {0}'.format(_system_start_objid))
+
         for i, page in enumerate(mungos.keys()):
+            print('Page {0}: total MuNG objects: {1}, with pitches: {2}'
+                  ''.format(page, len(mungos[page]),
+                            len([m for m in mungos[page]
+                                 if 'midi_pitch_code' in m.data])))
             page_system_bboxes, page_system_mungo_groups = \
                 group_mungos_by_system(
                     page_mungos=mungos[page],
                     score_img=self.sheet_pages[i],
-                    # page_num=i+1
+                    page_num=i+1
                 )
             system_bboxes[page] = page_system_bboxes
             system_mungo_groups[page] = page_system_mungo_groups
@@ -1565,6 +1571,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 try:
                     onset = self._mungo_onset_frame_for_current_performance(mungo)
                     _aln_onset, _aln_pitch = self._aligned_onset_and_pitch(mungo)
+                    plt.title("MuNG {0} (p: {1})"
+                              "".format(mungo.objid,
+                                        mungo.data['midi_pitch_code']))
                 except SheetManagerError:
                     mung_onset_successful = False
             else:

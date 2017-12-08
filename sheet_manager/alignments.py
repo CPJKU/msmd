@@ -235,6 +235,7 @@ class LilyPondLinkPitchParser(object):
                 # Try token
                 t = l[i+1:_forward_whitespace_position]
                 _in_token = False
+                _forward_whitespace_position = i  # single-space
                 if LilyPondLinkPitchParser.ly_token_is_note(t):
                     return i + 1
 
@@ -318,11 +319,168 @@ def align_score_to_performance(score, performance):
         Note that (a) not all MIDI matrix onsets have a corresponding visual
         object, (b) not all noteheads have a corresponding onset (ties!).
     """
-    ordered_mungos = score.get_ordered_notes(filter_tied=True)
+    ordered_mungo_cols = score.get_ordered_notes(filter_tied=True,
+                                                 reverse_columns=True,
+                                                 return_columns=True)
 
     #  - Unroll MIDI matrix (onsets left to right, simultaneous pitches top-down).
     note_events = performance.load_note_events()
 
+    aln = align_mungos_and_note_events_dtw(ordered_mungo_cols, note_events)
+
+    # aln = align_mungos_and_note_events_munkres(ordered_mungos, note_events)
+    mdict = dict()
+    for m_col in ordered_mungo_cols:
+        for m in m_col:
+            mdict[m.objid] =  m
+
+    for m_objid, e_idx in aln:
+        m = mdict[m_objid]
+        e = note_events[e_idx]
+        onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
+        m.data['{0}_onset_seconds'.format(performance.name)] = e[0]
+        m.data['{0}_onset_frame'.format(performance.name)] = int(onset_frame)
+
+    return aln
+
+
+def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
+    """Align the ordered MuNG columns to the given events using per-frame
+    DTW. A column of MuNG objects is one frame in the note space, a set
+    of events with the same onset is a frame in the event space.
+
+    The distance function used is "pitch dice": size of intersection between
+    the pitch sets over the union of the pitch sets.
+
+    (It could be weighted by the sizes of the columns.)
+
+    Within a column, pitch assignment can be done optimally again by DTW
+    on the pitch hinge loss.
+
+    Using DTW guarantees that the alignment is consistent with
+    the flow of time, provided that columns are never transposed.
+    """
+    n_mcols = len(ordered_mungo_columns)
+    n_events = len(events)
+
+    m_pitch_sets = [set([int(m.data['midi_pitch_code']) for m in col])
+                    for col in ordered_mungo_columns]
+
+    # Reverse mapping to event idxs, which we need after
+    # grouping events into simultaneity sets
+    _e2idx = {tuple(e): i for i, e in enumerate(events)}
+
+    event_simultaneities = collections.defaultdict(list)
+    event_simultaneity_idxs = collections.defaultdict(list)
+    for e_idx, e in enumerate(events):
+        event_simultaneities[e[0]].append(e)
+        event_simultaneity_idxs[e[0]].append(e_idx)
+    n_ecols = len(event_simultaneities)
+
+    onsets = sorted(event_simultaneities.keys())
+    ordered_event_columns = [event_simultaneities[onset] for onset
+                             in sorted(event_simultaneities.keys())]
+    e_pitch_sets = [set([int(e[1]) for e in e_sim])
+                    for e_sim in ordered_event_columns]
+
+    from dtw import dtw
+    print('Running DTW: total matrix size: {0}x{1}'
+          ''.format(len(m_pitch_sets), len(e_pitch_sets)))
+    dist, cost, acc, path = dtw(m_pitch_sets, e_pitch_sets,
+                                dist=lambda x, y:
+                                1 - len(x.intersection(y)) / float(len(x.union(y)))
+                                )
+
+    # Align the pitch sets against each other.
+    # If the DTW path goes only down, multiple MuNG columns correspond to
+    # a single onset. This is perfectly OK: e.g., in chords split into voices
+    # or with back-to-back noteheads, or if a tied note was accidentally
+    # not filtered out.
+    # If the DTW path goes only right, multiple onset columns correspond to
+    # a single MuNG column. This happens when there are more notes in the MIDI
+    # than wirtten, which should be pretty rare, except perhaps if the MIDI
+    # rendering engine follows arpeggio instruction.
+    # In both cases, we group the MuNG columns / event columns together
+    # and assign the groups to each other based on pitch & a single pitch
+    # ordering (we do not differentiate between the grouped columns' "onsets")
+    print('Processing alignment results. Path length: {0}'.format(len(path[0])))
+    # print('Path: {0}'.format(path))
+    aln = []
+    _i_prev = path[0][0]
+    _j_prev = path[1][0]
+    _current_m_group = ordered_mungo_columns[_i_prev]
+    _current_e_group = ordered_event_columns[_j_prev]
+    # ...appending to the paths makes sure to dump
+    for i, j in zip(list(path[0][1:]) + [path[0][-1] + 1],
+                    list(path[1][1:]) + [path[1][-1] + 1]):
+
+        # print('Positions: {0}, {1}'.format(i, j))
+
+        # If groups are finished:
+        if (i != _i_prev) and (j != _j_prev):
+            #print('Next grouping: positions {0}, {1} -- groups:'
+            #      ' {2}, {3}'.format(i, j, _current_m_group, _current_e_group))
+            # Align items in groups
+            sorted_m_group = sorted(_current_m_group,
+                                    key=lambda _m: _m.data['midi_pitch_code'])
+            sorted_e_group = sorted(_current_e_group,
+                                    key=lambda _e: _e[1])
+
+            _, _, _, c_path = dtw(sorted_m_group, sorted_e_group,
+                                  dist=lambda x, y: x.data['midi_pitch_code'] == int(y[1]))
+            for c_i, c_j in zip(c_path[0], c_path[1]):
+                # Only align MuNG object and event if their pitches match!
+                # This is what makes the MuNG <--> MIDI relationship reliable.
+                if sorted_m_group[int(c_i)].data['midi_pitch_code'] \
+                        != sorted_e_group[int(c_j)][1]:
+                    continue
+                aln.append((sorted_m_group[int(c_i)].objid,
+                            _e2idx[tuple( sorted_e_group[int(c_j)] )]
+                            ))
+
+            # Clear groups for next
+            _current_e_group = []
+            _current_m_group = []
+
+        if (i != _i_prev) and (i <= path[0][-1]):
+            m_col = ordered_mungo_columns[i]
+            _current_m_group.extend(m_col)
+
+        if (j != _j_prev) and (j <= path[1][-1]):
+            e_col = ordered_event_columns[j]
+            _current_e_group.extend(e_col)
+
+        _i_prev = i
+        _j_prev = j
+
+    print('Alignment done, total pairs: {0}'.format(len(aln)))
+
+    return aln
+    #
+    # simultaneity_aln = [(ordered_mungo_columns[i], ordered_event_columns[j])
+    #                     for i, j in zip(path[0], path[1])]
+    #
+    # # Align pitches within the pitch set. The alignment is supposed
+    # # to consist of tuples (m.objid, event_idx). This is where the
+    # # reverse dict _e2idx is needed.
+    # aln = []
+    # for m_col, e_col in simultaneity_aln:
+    #     sorted_m_col = sorted(m_col, key=lambda _m: _m.data['midi_pitch_code'])
+    #     sorted_e_col = sorted(e_col, key=lambda _e: _e[1])
+    #     _, _, _, c_path = dtw(sorted_m_col, sorted_e_col,
+    #                           dist=lambda x, y: x.data['midi_pitch_code'] == int(y[1]))
+    #     for c_i, c_j in zip(c_path[0], c_path[1]):
+    #         print('C_i, c_j = {0}'.format((c_i, c_j)))
+    #         if m_col[int(c_i)].data['midi_pitch_code'] != e_col[int(c_j)][1]:
+    #             continue
+    #         aln.append((m_col[int(c_i)].objid, _e2idx[tuple(e_col[c_j])]))
+    #
+    # return aln
+
+
+
+
+def align_mungos_and_note_events_munkres(ordered_mungos, note_events, _n_debugplots=10):
     #  - Assign to each MuNG object the MIDI note properties
     if len(note_events) != len(ordered_mungos):
         print('Number of note events and pitched MuNG objects does not'
@@ -330,24 +488,366 @@ def align_score_to_performance(score, performance):
               ''.format(len(note_events), len(ordered_mungos)))
 
     output = []
-    for note_event_idx, (m, e) in enumerate(zip(ordered_mungos, note_events)):
+
+    event_idx = 0
+    mung_idx = 0
+    while (event_idx < len(note_events)) \
+        and (mung_idx < len(ordered_mungos)):
+
+        m = ordered_mungos[mung_idx]
+        e = note_events[event_idx]
+
         pitch_m = int(m.data['midi_pitch_code'])
         pitch_e = int(e[1])
 
         if pitch_m != pitch_e:
             print('Pitch of MuNG object {0} and corresponding MIDI note {1}'
                   ' with onset {2} does not'
-                  ' match: MuNG {3}, event {4}'.format(m.objid, note_event_idx,
+                  ' match: MuNG {3}, event {4}'.format(m.objid, event_idx,
+                                                       e[0],
+                                                       pitch_m, pitch_e))
+            print('Falling back on munkres.')
+            # Apply munkres going forward.
+
+            N = 10
+
+            # The MuNG objects must be part of the same system!
+            m_snippet = ordered_mungos[mung_idx:mung_idx + N]
+            _m_snippet_idxs = {m.objid: i+1 for i, m in enumerate(m_snippet)}
+            # We need the snippet idxs to correctly assign event idxs
+            # in case Munkres skips an event, and to correctly move the
+            # e_idx and m_idx.
+
+            e_snippet = note_events[event_idx:event_idx + N]
+            _e_snippet_idxs = {tuple(e): i+1 for i, e in enumerate(e_snippet)}
+
+            snippet_aln = munkres_align_snippet(m_snippet, e_snippet,
+                                                _debugplot=(_n_debugplots > 0))
+            _n_debugplots -= 1
+            # Alignment still may contain pairs with mismatched pitches.
+
+            # Incorporating this back into the overall alignment:
+            # not all the MuNG objects were necessarily aligned.
+            # There may have been extra note events, which means that
+            # we did not give the MuNGs enough note events to align to.
+            # On the other hand, they may have been legitimate FPs.
+
+            # One solution is to take only the first K < N elements
+            # from the alignment.
+
+            K = 5
+
+            m_idx_shift = 0
+            e_idx_shift = 0
+            for am, ae in snippet_aln[:K]:
+                if am.data['midi_pitch_code'] != ae[1]:
+                    print('Munkres did not work on m.objid={0}/{1}, e={2:.2f}/{3}'
+                          ''.format(am.objid, am.data['midi_pitch_code'], ae[0], ae[1]))
+                    continue
+                onset_frame = notes_to_onsets([ae], dt=1.0 / FPS)
+                #am.data['{0}_onset_seconds'.format(performance.name)] = ae[0]
+                #am.data['{0}_onset_frame'.format(performance.name)] = int(onset_frame)
+                print('Munkres WORKED on m.objid={0}/{1}, e={2:.2f}/{3}'
+                      ''.format(am.objid, am.data['midi_pitch_code'], ae[0], ae[1]))
+
+                output.append((am.objid, event_idx + _e_snippet_idxs[tuple(ae)] - 1))
+
+                # Check how much move the index.
+                m_idx_shift = max(m_idx_shift, _m_snippet_idxs[am.objid])
+                e_idx_shift = max(e_idx_shift, _e_snippet_idxs[tuple(ae)])
+
+            print('Shifting out of {2} by: m={0}, e={1}'
+                  ''.format(m_idx_shift, e_idx_shift, K))
+
+            if (m_idx_shift == 0) and (e_idx_shift == 0):
+                print('Got stuck: nothing gets assigned to each other at index'
+                      ' positions m={0}, e={1}'.format(mung_idx, event_idx))
+                return output
+
+            mung_idx += m_idx_shift
+            event_idx += e_idx_shift
+
+        else:
+            print('Pitch of MuNG object {0} and corresponding MIDI note {1}'
+                  ' with onset {2} matches:'
+                  'MuNG {3}, event {4}'.format(m.objid, event_idx,
                                                        e[0],
                                                        pitch_m, pitch_e))
 
-        onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
-        m.data['{0}_onset_seconds'.format(performance.name)] = e[0]
-        m.data['{0}_onset_frame'.format(performance.name)] = int(onset_frame)
+            onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
+            #m.data['{0}_onset_seconds'.format(performance.name)] = e[0]
+            #m.data['{0}_onset_frame'.format(performance.name)] = int(onset_frame)
 
-        output.append((m.objid, note_event_idx))
+            output.append((m.objid, event_idx))
+
+            event_idx += 1
+            mung_idx += 1
 
     return output
+
+
+def munkres_align_snippet(mungos, events, _debugplot=False):
+    """Aligns the given MuNG objects and mm.note events using the munkres
+    algorithm."""
+    import munkres
+
+    # prepare cost structures
+
+    pitch_mismatch_cost = 3
+
+    # events = sorted(events, key=lambda x: (x[0], x[1] * -1))
+
+    event_start = min([e[0] for e in events])
+    event_end = max([e[0] + e[2] for e in events])
+    event_span = float(event_end - event_start)
+    event_proportional_starts = [(e[0] - event_start) / event_span
+                                 for e in events]
+
+    # This does not work if events cross systems...
+    # mungos = sorted(mungos, key=lambda x: (x.left, x.top))
+
+    mung_start = min([m.left for m in mungos])
+    mung_end = max([m.right for m in mungos])
+    mung_span = float(mung_end - mung_start)
+    mungo_proportional_starts = [(m.left - mung_start) / mung_span
+                                 for m in mungos]
+
+    aln = None
+
+    no_valid_assignment_found = True
+    disallowed_pairs = []
+    MAX_MUNKRES_ATTEMPTS = 8
+    _n_munkres_attempts = 0
+    while no_valid_assignment_found:
+        _n_munkres_attempts += 1
+
+        # Compute distances matrix
+        D = numpy.zeros((len(mungos), len(events)), dtype=numpy.float)
+
+        # ...add a "sink" row and column for un-alignable things?
+
+        for i, m in enumerate(mungos):
+            for j, e in enumerate(events):
+
+                cost = 0.0
+
+                m_position = mungo_proportional_starts[i]
+                e_position = event_proportional_starts[j]
+                prop_span = numpy.abs(m_position - e_position)
+                cost += prop_span
+
+                pitch_m = m.data['midi_pitch_code']
+                pitch_e = int(e[1])
+                if pitch_m != pitch_e:
+                    # print('m-{0}: {1}, e-{2}: {3}'.format(m.objid, pitch_m, j, e[1]))
+                    cost += pitch_mismatch_cost
+
+                D[i, j] = cost
+
+                if (m.objid, tuple(e)) in disallowed_pairs:
+                    D[i, j] = numpy.inf
+
+        # Add disallowed entries:
+
+        # init minimum assignment algorithm
+        mkr = munkres.Munkres()
+
+        print('Computing munkres...')
+        if D.shape[0] <= D.shape[1]:
+            assignment = numpy.asarray(sorted(mkr.compute(D.copy())))
+        else:
+            assignment = numpy.asarray(sorted(mkr.compute(D.T.copy())))
+            assignment = assignment[:, ::-1]
+        print('Done!')
+
+        if _debugplot:
+            import matplotlib
+            matplotlib.use('Qt4Agg')
+            import matplotlib.pyplot as plt
+            plt.figure()
+            plt.subplot(121)
+            plt.imshow(D.T)
+            plt.xticks(range(len(mungos)), [(m.objid, m.data['midi_pitch_code']) for m in mungos],
+                       rotation='vertical')
+            plt.yticks(range(len(events)), ['{0:.2f}: {1}'.format(e[0], int(e[1]))
+                                            for e in events])
+            plt.xlabel('MuNG objects')
+            plt.ylabel('MIDI events')
+
+            #######
+            # Plot alignment results
+            aln_map = numpy.zeros(D.shape)
+            for i, j in assignment:
+                aln_map[i, j] = 1
+                if mungos[i].data['midi_pitch_code'] != events[j][1]:
+                    aln_map[i, j] = 0.5
+            plt.subplot(122)
+            plt.imshow(aln_map.T)
+            plt.xticks(range(len(mungos)),
+                       [(m.objid, m.data['midi_pitch_code']) for m in mungos],
+                       rotation='vertical')
+            plt.yticks(range(len(events)), ['{0:.2f}: {1}'.format(e[0], int(e[1]))
+                                            for e in events])
+            plt.xlabel('MuNG objects')
+            plt.ylabel('MIDI events')
+            plt.show()
+
+        ########
+        # Produce alignment & check for conflicts
+        aln = [(mungos[i], events[j]) for i, j in assignment]
+
+        conflict_pair = find_conflict_in_alignment(aln, mungos, events, D)
+
+        if conflict_pair:
+            cm, ce = conflict_pair
+            _conflict_pair_hash = (cm.objid, tuple(ce))
+            print('Attempt {0}: found conflict pair: {1}'.format(_n_munkres_attempts,
+                                                                 _conflict_pair_hash))
+            disallowed_pairs.append(_conflict_pair_hash)
+            print('Disallowed pairs: {0}'
+                  ''.format(disallowed_pairs))
+            if _n_munkres_attempts > MAX_MUNKRES_ATTEMPTS:
+                print('Giving up: over 10 munkres attempts!')
+                break
+        else:
+            no_valid_assignment_found = False
+
+            print('Munkres: alignment found in {0} attempts'
+                  ''.format(_n_munkres_attempts))
+
+    return aln
+
+
+def find_conflict_in_alignment(aln, mungos, events,
+                               cost_matrix,
+                               columns_strict=True):
+    """Check if alignment is valid. If it is not, forbid
+    the invalid cells next time.
+    Alignment is invalid if the ordering of MuNGs
+    and events is inconsistent.
+    MuNG columns are equivalent with respect to onsets:
+    we don't care about differences within a column,
+    but if we move to the next column, the min. event onset must
+    not go *back*."""
+    mung_columns = group_mungos_by_column(mungos)
+    mung_lefts_per_column = {}
+    for l, col in mung_columns.items():
+        for m in col:
+            mung_lefts_per_column[m.objid] = l
+
+    # This is the output variable: a pair ``(m, e)``.
+    conflict_pair = None
+
+    _event_list = [tuple(e) for e in events]
+    _alndict = {m.objid: e for m, e in aln}
+    _onset_dict = {m.objid: e[0] for m, e in aln}
+    _onset_reverse_dict = collections.defaultdict(list)
+    for m, e in aln:
+        _onset_reverse_dict[e[1]].append(m)
+
+    # Strict "onset column" handling:
+    # All notes with the same onset should be in the same column.
+    for onset in _onset_reverse_dict:
+        onset_mungos = _onset_reverse_dict[onset]
+        onset_cols = [mung_lefts_per_column[m.objid] for m in onset_mungos]
+
+        if len(set(onset_cols)) <= 1:
+            continue
+
+        # If there are notes from multiple columns aligned to one onset:
+        #  - Disallow the highest-cost assignment on the onset.
+        _max_cost, _max_cost_pair = -numpy.inf, None
+        for m in onset_mungos:
+            e = _alndict[m.objid]
+            i, j = mungos.index(m), _event_list.index(tuple(e))
+            cost = cost_matrix[i, j]
+            if cost > _max_cost:
+                _max_cost = cost
+                _max_cost_pair = m, e
+
+        conflict_pair = _max_cost_pair
+        print('Found conflict: same ONSET, multiple COLUMNS!'
+              'Maximum cost pair in conflict column:'
+              ' m: {0}/{1}, e: {2:.3f}/{3}'.format(_max_cost_pair[0].objid,
+                                               _max_cost_pair[0].data['midi_pitch_code'],
+                                               _max_cost_pair[1][0],
+                                               _max_cost_pair[1][1]))
+
+    if conflict_pair is not None:
+        return conflict_pair
+
+    # Strict MuNG column handling:
+    # All notes within a column should have the same onset.
+    for l, col in mung_columns.items():
+        column_onset_counts = collections.defaultdict(int)
+        for m in col:
+            column_onset_counts[_alndict[m.objid][0]] += 1
+
+        if len(column_onset_counts) == 1:
+            continue
+
+        # If there are multiple onsets within a column:
+        #  - Disallow the highest-cost assignment in the column.
+        _max_cost = -numpy.inf
+        _max_cost_pair = None
+        for m in col:
+            e = _alndict[m.objid]
+            i, j = mungos.index(m), _event_list.index(tuple(e))
+            cost = cost_matrix[i, j]
+            if cost > _max_cost:
+                _max_cost = cost
+                _max_cost_pair = m, e
+
+        conflict_pair = _max_cost_pair
+        print('Found conflict: same COLUMN, multiple ONSETS!'
+              'Maximum cost pair in conflict column:'
+              ' m: {0}/{1}, e: {2:.3f}/{3}'.format(_max_cost_pair[0].objid,
+                                               _max_cost_pair[0].data['midi_pitch_code'],
+                                               _max_cost_pair[1][0],
+                                               _max_cost_pair[1][1]))
+
+    if conflict_pair is not None:
+        return conflict_pair
+
+    # Sort MuNGs by onset and find conflicts w.r.t their column left
+    # (transposition)
+    conflict_mungs = None
+
+    for _i, (m1, e1) in enumerate(sorted(aln, key=lambda kv: kv[1][0])):
+        for m2, e2 in sorted(aln, key=lambda kv: kv[1][0])[_i:]:
+            # If the *later* note is written *left*:
+            if mung_lefts_per_column[m2.objid] < mung_lefts_per_column[m1.objid]:
+                # If their pitches match (otherwise this will get removed anyway):
+                if m1.data['midi_pitch_code'] == m2.data['midi_pitch_code']:
+                    conflict_mungs = (m1, m2)
+                break
+        if conflict_mungs is not None:
+            break
+
+    if conflict_mungs is not None:
+        # We could clear the disallowed pairs here,
+        # but let's keep it greedy for now.
+        m1, m2 = conflict_mungs
+        # The MuNG/event pair with the higher cost is marked as forbidden.
+        e1 = _alndict[m1.objid]
+        e2 = _alndict[m2.objid]
+
+        i1, j1 = mungos.index(m1), _event_list.index(tuple(e1))
+        i2, j2 = mungos.index(m2), _event_list.index(tuple(e2))
+        cost1 = cost_matrix[i1, j1]
+        cost2 = cost_matrix[i2, j2]
+        if cost1 > cost2:
+            conflict_pair = m1, events[j1]
+        else:
+            conflict_pair = m2, events[j2]
+
+        print('Found conflict: TRANSPOSITION!'
+              'Maximum cost pair in conflict column(s):'
+              ' m: {0}/{1}, e: {2:.3f}/{3}'.format(conflict_pair[0].objid,
+                                               conflict_pair[0].data['midi_pitch_code'],
+                                               conflict_pair[1][0],
+                                               conflict_pair[1][1]))
+    return conflict_pair
 
 
 def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_WIDTH=5):
@@ -458,7 +958,7 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_
             peak_ends.append(i)
             ascending = False
 
-    logging.debug('Peaks: {0}'.format(zip(peak_starts, peak_ends)))
+    print('Peaks: {0}'.format(zip(peak_starts, peak_ends)))
     # Filter out very sharp peaks
     peak_starts, peak_ends = map(list, zip(*[(s, e)
                                              for s, e in zip(peak_starts, peak_ends)

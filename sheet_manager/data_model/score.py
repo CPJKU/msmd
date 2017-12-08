@@ -227,10 +227,16 @@ class Score(object):
         if not os.path.isdir(self.coords_dir):
             os.mkdir(self.coords_dir)
 
-    def get_ordered_notes(self, filter_tied=False):
+    def get_ordered_notes(self, filter_tied=False, reverse_columns=False,
+                          return_columns=False):
         """Returns the MuNG objects corresponding to notes in the canonical
         ordering: by page, system, left-to-right, and top-down within
-        simultaneities (e.g. chords)."""
+        simultaneities (e.g. chords).
+
+        :param reverse_columns: If set, will order the columns bottom-up
+            instead of top-down. Use this for events alignment, not for score
+            inference.
+        """
         self.update()
         if 'mung' not in self.views:
             raise SheetManagerDBError('Score {0}: mung view not available!'
@@ -263,8 +269,16 @@ class Score(object):
                 # Process simultaneities. We use a very small overlap ratio,
                 # because we want to catch also chords that have noteheads
                 # on both sides of the stem. Sorted top-down.
+                # Remove all tied notes.
+                if filter_tied:
+                    system_notes = [m for m in system_notes
+                                     if ('tied' not in m.data)
+                                     or (('tied' in m.data) and (m.data['tied'] != 1))
+                                    ]
+
                 system_note_columns = group_mungos_by_column(system_notes,
-                                                             MIN_OVERLAP_RATIO=0.05)
+                                                             MIN_OVERLAP_RATIO=0.05,
+                                                             reverse_columns=reverse_columns)
                 # print('System {0}: n_columns = {1}'
                 #       ''.format(s.objid, len(system_note_columns)))
                 ltr_sorted_columns = sorted(system_note_columns.items(),
@@ -306,20 +320,18 @@ class Score(object):
             for system in page:
                 ordered_simultaneities.extend(system)
 
+        if return_columns:
+            return ordered_simultaneities
+
         ordered_notes = []
         for sim in ordered_simultaneities:
             ordered_notes.extend(list(reversed(sim)))
 
-        # Remove all tied notes.
-        if filter_tied:
-            ordered_notes = [m for m in ordered_notes
-                             if ('tied' not in m.data)
-                             or (('tied' in m.data) and (m.data['tied'] != 1))
-                             ]
         return ordered_notes
 
 
-def group_mungos_by_column(page_mungos, MIN_OVERLAP_RATIO=0.5):
+def group_mungos_by_column(page_mungos, MIN_OVERLAP_RATIO=0.5,
+                           reverse_columns=False):
     """Group symbols into columns.
 
     Two symbols are put in one column if their overlap is at least
@@ -353,7 +365,9 @@ def group_mungos_by_column(page_mungos, MIN_OVERLAP_RATIO=0.5):
         l = mungo_to_leftmost[objid]
         mungo_columns[l].append(_mdict[objid])
 
-    # ...sort the MuNG columns from top to bottom:
-    sorted_mungo_columns = {l: sorted(mungos, key=lambda x: x.top)
+    # ...sort the MuNG columns, from top to bottom or bottom-up
+    # based on reverse_columns argument:
+    sorted_mungo_columns = {l: sorted(mungos, key=lambda x: x.top,
+                                      reverse=reverse_columns)
                             for l, mungos in mungo_columns.items()}
     return sorted_mungo_columns
