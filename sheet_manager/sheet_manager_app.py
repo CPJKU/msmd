@@ -506,6 +506,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
             print('Initializing normalized LilyPond file {0} failed!')
             return
 
+        # Update to current LilyPond version
+        convert_cmd = "convert-ly -e {0}".format(self.lily_normalized_file)
+        print('Normalizing LilyPond: updating syntax to latest possible'
+              ' version: {0}'.format(convert_cmd))
+        os.system(convert_cmd)
+
         # Translate to default pitch language?
         translate_cmd = 'ly -i "translate english" {0}'.format(self.lily_normalized_file)
         print('Normalizing LilyPond: translating pitch names: {0}'.format(translate_cmd))

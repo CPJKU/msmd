@@ -64,8 +64,10 @@ class LilyPondLinkPitchParser(object):
     to LilyPond files."""
     RELEVANT_CHARS = []
 
-    # NONRELEVANT_CHARS = list("{}()[]~\\/=|<>.^!?0123456789#\"")
-    NONRELEVANT_CHARS = list("{}()[]\\/=|<>.^!?#\"%-")
+    # NONRELEVANT_CHARS = list("{}()[]_~\\/=|<>.^!?0123456789#\"")
+    # ...this one was deprecated, since we (a) need ties (~), (b)
+    #    don't have to strip out durations.
+    NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-")
 
     TIE_CHAR = '~'
 
@@ -102,7 +104,15 @@ class LilyPondLinkPitchParser(object):
 
             token = self.ly_token_from_location(row, col,
                                                 ly_data=self.ly_data_dict[fname])
-            midi_pitch_code = self.ly_token_to_midi_pitch(token)
+
+            try:
+                midi_pitch_code = self.ly_token_to_midi_pitch(token)
+            except SheetManagerLyParsingError as e:
+                raise SheetManagerLyParsingError('Token {0} at location {1}'
+                                                 ' could not be parsed. Line:'
+                                                 ' {2}'
+                                                 ''.format(token, (row, col),
+                                                           self.ly_data_dict[fname][row]))
             output[c.objid] = midi_pitch_code
 
         print('TOTAL TIED NOTES: {0}'.format(_n_ties))
@@ -427,7 +437,19 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
                                     key=lambda _e: _e[1])
 
             _, _, _, c_path = dtw(sorted_m_group, sorted_e_group,
-                                  dist=lambda x, y: x.data['midi_pitch_code'] == int(y[1]))
+                                  dist=lambda x, y: x.data['midi_pitch_code'] != int(y[1]))
+
+            if len(sorted_m_group) > 2:
+                _frames = [int(numpy.ceil(_e[0] / 0.05)) for _e in sorted_e_group]
+                print('Matched column pitches, frame {2}:'
+                      '\n\tMuNG:   {0}'
+                      '\n\tEvents: {1}'.format(
+                    [_m.data['midi_pitch_code'] for _m in sorted_m_group],
+                    [_e[1] for _e in sorted_e_group],
+                    _frames[0]
+                ))
+                print('\tAln path: {0}'.format(c_path))
+
             for c_i, c_j in zip(c_path[0], c_path[1]):
                 # Only align MuNG object and event if their pitches match!
                 # This is what makes the MuNG <--> MIDI relationship reliable.
