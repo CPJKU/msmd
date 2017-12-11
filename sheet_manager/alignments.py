@@ -170,7 +170,10 @@ class LilyPondLinkPitchParser(object):
                 logging.debug('There is a tie towards the left!')
                 logging.debug(_debugprint)
 
-            if len(ll_tokens) == 0:
+            # if len(ll_tokens) == 0:
+            if not LilyPondLinkPitchParser._find_location_of_last_note(line,
+                                                                       ly_data,
+                                                                       max_col=col):
                 process_prev_line = True
                 # logging.debug(_debugprint)
                 # logging.debug('Looking at prev. line')
@@ -202,7 +205,7 @@ class LilyPondLinkPitchParser(object):
             if LilyPondLinkPitchParser.TIE_CHAR in ly_data[line]:
                 logging.debug('previous line {0} has tie char!'.format(line))
                 logging.debug('\t\tcol: {0}, tie char position: {1}'
-                      ''.format(col, ly_data[line].index(LilyPondLinkPitchParser.TIE_CHAR)))
+                              ''.format(col, ly_data[line].index(LilyPondLinkPitchParser.TIE_CHAR)))
 
             if LilyPondLinkPitchParser.TIE_CHAR in ly_data[line][col:]:
                 logging.debug(_debugprint)
@@ -227,12 +230,14 @@ class LilyPondLinkPitchParser(object):
         return has_notes
 
     @staticmethod
-    def _find_location_of_last_note(line, ly_data):
+    def _find_location_of_last_note(line, ly_data, max_col=None):
         """Tries to find the column at which the rightmost token
         parseable as a note on the given ``line`` of ``ly_data``
         starts. If no such token is found, returns None.
         """
         l = ly_data[line]
+        if max_col is not None:
+            l = l[:max_col]
 
         _forward_whitespace_position = len(l)
         _in_token = False
@@ -329,7 +334,7 @@ def align_score_to_performance(score, performance):
         Note that (a) not all MIDI matrix onsets have a corresponding visual
         object, (b) not all noteheads have a corresponding onset (ties!).
     """
-    ordered_mungo_cols = score.get_ordered_notes(filter_tied=True,
+    ordered_mungo_cols = score.get_ordered_notes(filter_tied=False,
                                                  reverse_columns=True,
                                                  return_columns=True)
 

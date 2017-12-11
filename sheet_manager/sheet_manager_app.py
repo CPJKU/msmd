@@ -1383,11 +1383,46 @@ class SheetManager(QtGui.QMainWindow, form_class):
         plt.ylabel("%d Pixel" % self.sheet_pages[page_id].shape[0], fontsize=self.axis_label_fs)
 
         # plot note coordinates
+        # They are color-coded to automatically show various situations:
+        #   - cobalt: aligned to an event and they are OK
+        #   - yellow: not aligned to an event, tied attribute is set
+        #   - red: not aligned to an event, tied attribute is NOT set
         if self.checkBox_showCoords.isChecked():
-            plt.plot(self.page_coords[page_id][:, 1], self.page_coords[page_id][:, 0], 'co', alpha=0.6)
             if self._page_mungo_centroids is not None:
                 mcentroids = self._page_mungo_centroids[page_id]
-                plt.plot(mcentroids[:, 1], mcentroids[:, 0], 'yo', alpha=0.6)
+                # Split MuNG objects based on whether they are aligned or not
+                aln_hit_m_centroids = []
+                aln_miss_m_centroids = []
+                aln_tied_m_centroids = []
+
+                for mc in mcentroids:
+                    mc = float(mc[0]), float(mc[1])
+                    m = self._page_centroids2mungo_map[page_id][mc]
+                    # Do not display system MuNGs.
+                    if m.clsname == 'staff':
+                        continue
+                    try:
+                        onset = self._mungo_onset_frame_for_current_performance(m)
+                        _aln_onset, _aln_pitch = self._aligned_onset_and_pitch(m)
+                    except SheetManagerError:
+                        if ('tied' in m.data) and (m.data['tied'] == 1):
+                            aln_tied_m_centroids.append(mc)
+                        else:
+                            aln_miss_m_centroids.append(mc)
+                    else:
+                        aln_hit_m_centroids.append(mc)
+
+
+                aln_hit_m_centroids = np.asarray(aln_hit_m_centroids)
+                aln_miss_m_centroids = np.asarray(aln_miss_m_centroids)
+                aln_tied_m_centroids = np.asarray(aln_tied_m_centroids)
+
+                plt.plot(aln_hit_m_centroids[:, 1], aln_hit_m_centroids[:, 0], 'co', alpha=0.4)
+                plt.plot(aln_miss_m_centroids[:, 1], aln_miss_m_centroids[:, 0], 'ro', alpha=0.6)
+                plt.plot(aln_tied_m_centroids[:, 1], aln_tied_m_centroids[:, 0], 'yo', alpha=0.4)
+
+            else:
+                plt.plot(self.page_coords[page_id][:, 1], self.page_coords[page_id][:, 0], 'co', alpha=0.6)
 
         # plot systems
         if self.checkBox_showSystems.isChecked():
@@ -1451,28 +1486,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         plt.pause(0.1)
         # plt.show()
-
-        # toolbar._views._elements += _prev_views  # Contains the current view as well
-        # toolbar._positions._elements += _prev_positions
-        #
-        # # else:
-        # #     plt.xlim([0, self.sheet_pages[page_id].shape[1] - 1])
-        # #     plt.ylim([self.sheet_pages[page_id].shape[0] - 1, 0])
-        # in_ax.upate_from(ax)
-        ### toolbar = plt.gcf().canvas.toolbar
-        ### toolbar._views._elements = _prev_view_elements
-        ### toolbar._positions._elements = _prev_position_elements
-        # toolbar._xypress = copy.deepcopy(prev_toolbar._xypress)  # the location and axis info at the time
-        #                       # of the press
-        # toolbar._idPress = copy.deepcopy(prev_toolbar._idPress)
-        # toolbar._idRelease = copy.deepcopy(prev_toolbar._idRelease)
-        # toolbar._active = copy.deepcopy(prev_toolbar._active)
-        # toolbar._lastCursor = copy.deepcopy(prev_toolbar._lastCursor)
-        # toolbar._ids_zoom = copy.deepcopy(prev_toolbar._ids_zoom)
-        # toolbar._zoom_mode = copy.deepcopy(prev_toolbar._zoom_mode)
-        # toolbar._button_pressed = copy.deepcopy(prev_toolbar._button_pressed)  # determined by the button pressed
-        #                              # at start
-        # toolbar.mode = copy.deepcopy(prev_toolbar.mode)  # a mode string for the status bar
 
         plt.gcf().canvas.toolbar._update_view()
 
