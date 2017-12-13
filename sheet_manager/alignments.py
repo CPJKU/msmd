@@ -69,6 +69,8 @@ class LilyPondLinkPitchParser(object):
     #    don't have to strip out durations.
     NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-")
 
+    STRICT_NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-~")
+
     TIE_CHAR = '~'
 
     def __init__(self):
@@ -296,7 +298,15 @@ class LilyPondLinkPitchParser(object):
             midi_code = wp.number + 60
             return midi_code
         except Exception as e:
-            raise SheetManagerLyParsingError(e.message)
+            # Try stripping away stuff more strictly
+            ly_token_strict = ly_token.replace('~', '')
+            if ly_token_strict != ly_token:
+                try:
+                    return LilyPondLinkPitchParser.ly_token_to_midi_pitch(ly_token_strict)
+                except Exception as e:
+                    raise SheetManagerLyParsingError(e.message)
+            else:
+                raise SheetManagerLyParsingError(e.message)
 
     @staticmethod
     def parse_ly_file_link(link_str):
@@ -378,8 +388,23 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
     n_mcols = len(ordered_mungo_columns)
     n_events = len(events)
 
-    m_pitch_sets = [set([int(m.data['midi_pitch_code']) for m in col])
-                    for col in ordered_mungo_columns]
+    m_pitch_sets = []
+    for col in ordered_mungo_columns:
+        _pitches = []
+        for m in col:
+            p = m.data['midi_pitch_code']
+            try:
+                p = int(p)
+            except Exception as e:
+                print('Note with no pitch got into alignment???\n{0}'
+                      ''.format(m))
+                raise(e)
+            _pitches.append(p)
+        _pitches = set(_pitches)
+        m_pitch_sets.append(_pitches)
+
+    # m_pitch_sets = [set([int(m.data['midi_pitch_code']) for m in col])
+    #                 for col in ordered_mungo_columns]
 
     # Reverse mapping to event idxs, which we need after
     # grouping events into simultaneity sets
@@ -503,8 +528,6 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
     #         aln.append((m_col[int(c_i)].objid, _e2idx[tuple(e_col[c_j])]))
     #
     # return aln
-
-
 
 
 def align_mungos_and_note_events_munkres(ordered_mungos, note_events, _n_debugplots=10):
@@ -877,7 +900,8 @@ def find_conflict_in_alignment(aln, mungos, events,
     return conflict_pair
 
 
-def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_WIDTH=5):
+def group_mungos_by_system(page_mungos, score_img=None, page_num=None,
+                           MIN_PEAK_WIDTH=5, NONWHITE_COLUMNS_TOLERANCE=0.001):
     """Groups the MuNG objects on a page into systems. Assumes
     piano music: there is a system break whenever a pitch that
     overlaps horizontally and is lower on the page is higher
@@ -941,10 +965,10 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None, MIN_PEAK_
         img_hproj = img_binarized.sum(axis=1)[:dividers_hproj.shape[0]]
         img_hproj_norm = img_hproj / img_binarized.max()
         max_img_hproj = max(img_hproj_norm)
-        _tolerance = 0.02
+        # NONWHITE_COLUMNS_TOLERANCE = 0.02
         print('Allowed peaks threshold: {0}, with maximum {1}'
-              ''.format(max_img_hproj * (1 - _tolerance), max_img_hproj))
-        allowed_peaks_hproj = img_hproj_norm >= (max_img_hproj * (1 - _tolerance))
+              ''.format(max_img_hproj * (1 - NONWHITE_COLUMNS_TOLERANCE), max_img_hproj))
+        allowed_peaks_hproj = img_hproj_norm >= (max_img_hproj * (1 - NONWHITE_COLUMNS_TOLERANCE))
 
 
     ### DEBUG

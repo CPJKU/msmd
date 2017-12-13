@@ -212,7 +212,7 @@ class Score(object):
         """
         metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
         if not os.path.isfile(metafile):
-            logging.warn('Score {0} has no metadata file: {1}'
+            logging.info('Score {0} has no metadata file: {1}'
                          ''.format(self.name, self.DEFAULT_META_FNAME))
             return dict()
 
@@ -265,6 +265,18 @@ class Score(object):
             for s in system_mungos:
                 system_notes = mgraph.ancestors(s,
                                                 classes=_CONST.NOTEHEAD_CLSNAMES)
+                for c in system_notes:
+                    if 'midi_pitch_code' not in c.data:
+                        print('Notehead without pitch: {0}'
+                              ''.format(str(c)))
+                        continue
+                    if c.data['midi_pitch_code'] is None:
+                        print('Notehead with pitch=None: {0}'
+                              ''.format(str(c)))
+
+                system_notes = [c for c in system_notes
+                                if 'midi_pitch_code' in c.data]
+
                 # print('Ancestors of system {0}: {1}'.format(s, system_notes))
                 # Process simultaneities. We use a very small overlap ratio,
                 # because we want to catch also chords that have noteheads

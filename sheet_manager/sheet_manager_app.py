@@ -1412,14 +1412,17 @@ class SheetManager(QtGui.QMainWindow, form_class):
                     else:
                         aln_hit_m_centroids.append(mc)
 
+                if len(aln_hit_m_centroids) > 0:
+                    aln_hit_m_centroids = np.asarray(aln_hit_m_centroids)
+                    plt.plot(aln_hit_m_centroids[:, 1], aln_hit_m_centroids[:, 0], 'co', alpha=0.4)
 
-                aln_hit_m_centroids = np.asarray(aln_hit_m_centroids)
-                aln_miss_m_centroids = np.asarray(aln_miss_m_centroids)
-                aln_tied_m_centroids = np.asarray(aln_tied_m_centroids)
+                if len(aln_miss_m_centroids) > 0:
+                    aln_miss_m_centroids = np.asarray(aln_miss_m_centroids)
+                    plt.plot(aln_miss_m_centroids[:, 1], aln_miss_m_centroids[:, 0], 'ro', alpha=0.6)
 
-                plt.plot(aln_hit_m_centroids[:, 1], aln_hit_m_centroids[:, 0], 'co', alpha=0.4)
-                plt.plot(aln_miss_m_centroids[:, 1], aln_miss_m_centroids[:, 0], 'ro', alpha=0.6)
-                plt.plot(aln_tied_m_centroids[:, 1], aln_tied_m_centroids[:, 0], 'yo', alpha=0.4)
+                if len(aln_tied_m_centroids) > 0:
+                    aln_tied_m_centroids = np.asarray(aln_tied_m_centroids)
+                    plt.plot(aln_tied_m_centroids[:, 1], aln_tied_m_centroids[:, 0], 'yo', alpha=0.4)
 
             else:
                 plt.plot(self.page_coords[page_id][:, 1], self.page_coords[page_id][:, 0], 'co', alpha=0.6)
