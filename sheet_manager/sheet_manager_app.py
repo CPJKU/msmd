@@ -237,7 +237,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             "."))
         self.load_piece(folder_name=folder_name)
 
-    def process_piece(self, piece_folder, workflow="ly"):
+    def process_piece(self, piece_folder, workflow="ly", omr=False):
         """Process the entire piece, using the specified workflow.
 
         :param piece_folder: The path of the requested piece folder.
@@ -278,22 +278,24 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.extract_performance_features()
         self.load_performance_features()
 
-        # OMR
+        # Alignment
         self.load_sheet()
 
-        if not self.omr:
-            self.init_omr()
-        self.detect_systems()
-        self.detect_bars()
+        # OMR
+        if omr:
 
-        # If we are unlucky and have no LilyPond source:
-        if not is_workflow_ly:
-            self.detect_note_heads()
+            if not self.omr:
+                self.init_omr()
+            self.detect_systems()
+            self.detect_bars()
+
+            # If we are unlucky and have no LilyPond source:
+            if not is_workflow_ly:
+                self.detect_note_heads()
 
         # Align written notes and performance onsets
-        # [NOT IMPLEMENTED]
-        self.sort_bar_coords()
-        self.sort_note_coords()
+        # self.sort_bar_coords()
+        # self.sort_note_coords()
 
         self.save_coords()
 
@@ -2040,6 +2042,9 @@ def run_batch_mode(args):
     # Does not do mgr.show()!
     # app.exec_()
 
+    success_pieces = []
+    failed_pieces = []
+
     _start_time = time.clock()
     _last_time = time.clock()
     for i, (piece, piece_dir) in enumerate(zip(pieces, piece_dirs)):
@@ -2047,8 +2052,10 @@ def run_batch_mode(args):
 
         try:
             mgr.process_piece(piece_dir, workflow="ly")
+
         except SheetManagerError as mgre:
             print('SheetManagerError: {0}'.format(mgre.message))
+            failed_pieces.append((piece, piece_dir))
 
         _now = time.clock()
         print('... {0:.2f} s (Total time expired: {1:.2f} s)'

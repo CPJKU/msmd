@@ -1192,6 +1192,7 @@ def group_mungos_by_system_paths(page_mungos, score_img, page_num=None):
                                                connectivity=8)
 
     # Only retain as systems labels that connect from left to right.
+    CONNECTIVITY_TOLERANCE = 0
     left_side_system_labels = set(system_labels[:, 0])
     right_side_system_labels = set(system_labels[:, -1])
     separating_system_labels = left_side_system_labels.intersection(

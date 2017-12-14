@@ -81,13 +81,23 @@ def no_unfold_repeats(lines):
     return output
 
 
+def ties_have_spaces(lines):
+    """Makes sure there is whitespace around every tie."""
+    output = []
+    for i, l in enumerate(lines):
+        output_line = re.sub('~', ' ~ ', l)
+        output.append(output_line)
+    return output
+
+
 def process_file(ly_file):
     ly_data = load_ly_lines(ly_file)
     with_includes = process_includes(ly_data,
                                      filename=ly_file,
                                      join=False)
     no_unfolds = no_unfold_repeats(with_includes)
-    return no_unfolds
+    spaced_ties = ties_have_spaces(no_unfolds)
+    return spaced_ties
 
 ##############################################################################
 
