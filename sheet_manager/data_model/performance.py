@@ -102,7 +102,7 @@ class Performance(object):
                                                          suffix])
         if feature_name in self.features:
             if overwrite:
-                logging.warn('Performance {0}: overwriting feature {1}!'
+                logging.info('Performance {0}: overwriting feature {1}!'
                              ''.format(self.folder, feature_name))
             else:
                 logging.warn('Performance {0}: feature {1} already exists!'
@@ -175,7 +175,7 @@ class Performance(object):
         """Loads arbitrary YAML descriptors with the default name (meta.yml)."""
         metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
         if not os.path.isfile(metafile):
-            logging.warn('Performance {0} has no metadata file: {1}'
+            logging.info('Performance {0} has no metadata file: {1}'
                          ''.format(self.name, self.DEFAULT_META_FNAME))
             return dict()
 

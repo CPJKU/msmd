@@ -141,9 +141,9 @@ class Score(object):
         self.update()
         if view_name in self.views:
             if overwrite:
-                logging.warning('Score {0}: view {1} already exists;'
-                                ' overwriting...'.format(self.name,
-                                                         view_name))
+                logging.info('Score {0}: view {1} already exists;'
+                             ' overwriting...'.format(self.name,
+                                                      view_name))
                 time.sleep(3)
                 self.clear_view(view_name)
             else:

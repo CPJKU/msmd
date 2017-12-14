@@ -70,9 +70,9 @@ class LilyPondLinkPitchParser(object):
     # NONRELEVANT_CHARS = list("{}()[]_~\\/=|<>.^!?0123456789#\"")
     # ...this one was deprecated, since we (a) need ties (~), (b)
     #    don't have to strip out durations.
-    NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-\t")
+    NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-\t0123456789")
 
-    STRICT_NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-~\t")
+    STRICT_NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-~\t0123456789")
 
     TIE_CHAR = '~'
 
@@ -100,8 +100,8 @@ class LilyPondLinkPitchParser(object):
                 self.ly_token_dict[fname] = tokens
 
             if self.check_tie_before_location(row, col, ly_data=self.ly_data_dict[fname]):
-                print('PROCESS FOUND TIE: mungo objid = {0},'
-                      ' location = {1}'.format(c.objid, (c.top, c.left)))
+                logging.info('PROCESS FOUND TIE: mungo objid = {0},'
+                             ' location = {1}'.format(c.objid, (c.top, c.left)))
                 _n_ties += 1
                 c.data['tied'] = 1
             else:
@@ -120,7 +120,7 @@ class LilyPondLinkPitchParser(object):
                                                            self.ly_data_dict[fname][row]))
             output[c.objid] = midi_pitch_code
 
-        print('TOTAL TIED NOTES: {0}'.format(_n_ties))
+        logging.info('TOTAL TIED NOTES: {0}'.format(_n_ties))
 
         self.ly_data_dict = dict()
         return output
@@ -427,8 +427,8 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
                     for e_sim in ordered_event_columns]
 
     from dtw import dtw
-    print('Running DTW: total matrix size: {0}x{1}'
-          ''.format(len(m_pitch_sets), len(e_pitch_sets)))
+    logging.info('Running DTW: total matrix size: {0}x{1}'
+                 ''.format(len(m_pitch_sets), len(e_pitch_sets)))
     dist, cost, acc, path = dtw(m_pitch_sets, e_pitch_sets,
                                 dist=lambda x, y:
                                 1 - len(x.intersection(y)) / float(len(x.union(y)))
@@ -446,7 +446,7 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
     # In both cases, we group the MuNG columns / event columns together
     # and assign the groups to each other based on pitch & a single pitch
     # ordering (we do not differentiate between the grouped columns' "onsets")
-    print('Processing alignment results. Path length: {0}'.format(len(path[0])))
+    logging.info('Processing alignment results. Path length: {0}'.format(len(path[0])))
     # print('Path: {0}'.format(path))
     aln = []
     _i_prev = path[0][0]
@@ -508,7 +508,7 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
         _i_prev = i
         _j_prev = j
 
-    print('Alignment done, total pairs: {0}'.format(len(aln)))
+    logging.info('Alignment done, total pairs: {0}'.format(len(aln)))
 
     return aln
     #
@@ -1012,7 +1012,7 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None,
             peak_ends.append(i)
             ascending = False
 
-    print('Peaks: {0}'.format(zip(peak_starts, peak_ends)))
+    logging.debug('Peaks: {0}'.format(zip(peak_starts, peak_ends)))
 
     if len(peak_starts) == 0:
         # no peaks: only one system => all MuNG objects
@@ -1147,7 +1147,9 @@ def find_column_divider_regions(sorted_mungo_columns):
     return dividers
 
 
-def group_mungos_by_system_paths(page_mungos, score_img, page_num=None):
+def group_mungos_by_system_paths(page_mungos, score_img, page_num=None,
+                                 CONNECTIVITY_TOLERANCE=10,
+                                 _debugplot=False):
     """Groups the MuNG objects (assumed only notes) by system using separating
     paths. A separating path is a background-only path that connects the left
     and right limit of the region in which the MuNG objects are.
@@ -1160,19 +1162,71 @@ def group_mungos_by_system_paths(page_mungos, score_img, page_num=None):
     Separating paths pixels are pixels of connected components of the (white)
     background of the image region delimited by MuNG that touch both the left
     and right edge of this region.
+
+    :param connectivity_tolerance: How many pixels from the edge can a system
+        start. Useful for first systems that are usually shorter, because
+        the instrument name is on their left side.
     """
+
     pt, pl, pb, pr = cropobjects_merge_bbox(page_mungos)
-    canvas = score_img[:pb, pl:pr]
+    canvas = score_img[:pb, :pr]
+
+    # This bounding box is too small in pieces with single-measure lines.
+    # It needs to include the multi-staff braces at the beginning.
+    # ...maybe an option is to project the "empty rows" leftward
+    #    and only keep the separating region if at least 10 % of its
+    #    rows project leftward without interruption?
+
     import cv2
     _, canvas_bin = cv2.threshold(canvas, 0, canvas.max(),
                                  cv2.THRESH_BINARY+cv2.THRESH_OTSU)
     _, labels = cv2.connectedComponents(canvas_bin, connectivity=8)
     left_side_labels = set(labels[:, 0])
     right_side_labels = set(labels[:, -1])
-    separating_labels = left_side_labels.intersection(right_side_labels)
+    separating_label_candidates = left_side_labels.intersection(right_side_labels)
     # Filter out background label
-    if 0 in separating_labels:
-        separating_labels = [l for l in separating_labels if l != 0]
+    if 0 in separating_label_candidates:
+        separating_label_candidates = [l for l in separating_label_candidates
+                                       if l != 0]
+
+    separating_labels = separating_label_candidates
+    #
+    # # Now apply the projection to the left, to filter out single-measure systems
+    # _, left_img_bin = cv2.threshold(score_img[pt:pb, :pl], 0, score_img.max(),
+    #                                 cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    # left_img_bin[left_img_bin != left_img_bin.max()] = 2
+    # left_img_bin[left_img_bin > 2] = 0
+    # left_img_bin[left_img_bin != 0] = 1
+    #
+    # left_separating_labels = labels[:, :2]
+    # left_sep_regions = regionprops(left_separating_labels)
+    #
+    # separating_labels = []
+    # for lsr in left_sep_regions:
+    #     if lsr.label not in separating_label_candidates:
+    #         continue
+    #
+    #     lsr_t, lsr_l, lsr_b, lsr_r = lsr.bbox
+    #     # In this crop, sheet background is 0 and non-bg is 1
+    #     left_img_crop = left_img_bin[lsr_t:lsr_b]
+    #     left_img_hproj = left_img_crop.sum(axis=1)
+    #     # Are all rows non-zero?
+    #
+    #     if len(left_img_hproj.nonzero()[0]) == 0:
+    #
+    #         if _debugplot:
+    #             import matplotlib
+    #             matplotlib.use('Qt4Agg')
+    #             import matplotlib.pyplot as plt
+    #             plt.figure()
+    #             plt.title('Discarding sep. region, rows: {0}--{1}'.format(lsr_t, lsr_b))
+    #             plt.imshow(left_img_crop, cmap='gray', interpolation='nearest')
+    #             plt.plot(left_img_hproj * 5, numpy.arange(left_img_hproj.shape[0]))
+    #             plt.show()
+    #
+    #         continue
+    #
+    #     separating_labels.append(lsr.label)
 
     if len(separating_labels) == 0:
         print('No separating path found!')
@@ -1191,13 +1245,32 @@ def group_mungos_by_system_paths(page_mungos, score_img, page_num=None):
     _, system_labels = cv2.connectedComponents(separated_region_mask,
                                                connectivity=8)
 
+    system_regions = regionprops(system_labels)
+    separating_system_labels = []
+    _c_height, _c_width = system_labels.shape
+    for sr in system_regions:
+        _is_system = False
+        srt, srl, srb, srr = sr.bbox
+        if (srl < CONNECTIVITY_TOLERANCE) \
+                and (srr > (_c_width - CONNECTIVITY_TOLERANCE)):
+            _is_system = True
+
+        if ((srb - srt) > (_c_height * 0.08)) \
+            and ((srr - srl) > _c_width * 0.5) \
+                and (sr.extent > 0.5) \
+                and (sr.area > (0.05 * _c_height * _c_width)):
+            _is_system = True
+
+        if _is_system:
+            separating_system_labels.append(sr.label)
+
     # Only retain as systems labels that connect from left to right.
-    CONNECTIVITY_TOLERANCE = 0
-    left_side_system_labels = set(system_labels[:, 0])
-    right_side_system_labels = set(system_labels[:, -1])
-    separating_system_labels = left_side_system_labels.intersection(
-                                                right_side_system_labels)
-    separating_system_labels = [l for l in separating_system_labels if l != 0]
+    # CONNECTIVITY_TOLERANCE = 10
+    # left_side_system_labels = set(system_labels[:, 0 + CONNECTIVITY_TOLERANCE])
+    # right_side_system_labels = set(system_labels[:, -1 - CONNECTIVITY_TOLERANCE])
+    # separating_system_labels = left_side_system_labels.intersection(
+    #                                             right_side_system_labels)
+    # separating_system_labels = [l for l in separating_system_labels if l != 0]
     separating_syslabel_image = numpy.zeros(system_labels.shape, dtype='uint8')
     for l in separating_system_labels:
         separating_syslabel_image[system_labels == l] = l
@@ -1241,7 +1314,7 @@ def group_mungos_by_system_paths(page_mungos, score_img, page_num=None):
     system_groups = collections.defaultdict(list)
     for m in page_mungos:
         # DON'T translate MuNG-O bounding box top to canvas now:
-        ct, cl, cb, cr = m.top, m.left - pl, m.bottom, m.right - pl
+        ct, cl, cb, cr = m.top, m.left, m.bottom, m.right
         # ct, cl, cb, cr = m.bounding_box
         # Can use the MuNG-O mask to make the intersection more accurate,
         # but this doesn't matter much for noteheads at 835 px page width.
@@ -1272,7 +1345,7 @@ def group_mungos_by_system_paths(page_mungos, score_img, page_num=None):
                                          if len(g) > 0])
 
     # Debugging plot:
-    if page_num is not None:
+    if _debugplot:
         import matplotlib
         matplotlib.use('Qt4Agg')
         import matplotlib.pyplot as plt
@@ -1280,7 +1353,7 @@ def group_mungos_by_system_paths(page_mungos, score_img, page_num=None):
         plt.imshow(canvas_bin, cmap='gray', interpolation='nearest')
         _img_system_labels = system_labels * 1
         _img_system_labels[_img_system_labels != 0] += 10
-        plt.imshow(_img_system_labels, interpolation='nearest', alpha=1.0)
+        plt.imshow(_img_system_labels, interpolation='nearest', alpha=0.6)
         plt.title('Detected system regions, page {0}'.format(page_num))
         plt.show()
 
@@ -1328,12 +1401,15 @@ def alignment_stats(mungos, events, aln):
 
     (You can call this per-page.)
 
-    The result can flag a suspicious piece, based on some criteria
+    The result can help flag a suspicious piece, based on some criteria
     on the stats.
     """
     mdict = {m.objid: m for m in mungos}
     aln_dict = {objid: e_idx for objid, e_idx in aln.items()}
-    event_hits = [0 for _ in events]
+    if isinstance(events, dict):
+        event_hits = {e_idx: 0 for e_idx in events}
+    else:
+        event_hits = {e_idx: 0 for e_idx in range(len(events))}
 
     n_mungos = len(mungos)
     n_events = len(event_hits)
@@ -1378,15 +1454,15 @@ def alignment_stats(mungos, events, aln):
 
         event = events[e_idx]
         e_pitch = int(event[1])
-        e_onset_s = event[0]
-        e_onset_frame = notes_to_onsets([event], 1.0 / FPS)[0]
+        # e_onset_s = event[0]
+        # e_onset_frame = notes_to_onsets([event], 1.0 / FPS)[0]
 
         if m_pitch == e_pitch:
             mungos_aligned_correct_pitch.append(m)
         else:
             mungos_aligned_wrong_pitch.append(m)
 
-    for e_idx, n_hits in enumerate(event_hits):
+    for e_idx, n_hits in event_hits.items():
         if n_hits == 0:
             e = events[e_idx]
             events_without_corresponding_mungo.append(e)
@@ -1423,3 +1499,17 @@ def alignment_stats(mungos, events, aln):
                      system_mungos=system_mungos)
 
     return stats
+
+
+def is_aln_problem(stats):
+    """Returns a guess whether the given stats point to a problem
+    in the alignment."""
+    is_problem = False
+
+    n_probable_errors = len(stats.mungos_not_aligned_not_tied)
+    n_probable_correct = len(stats.mungos_aligned_correct_pitch)
+    p_red = float(n_probable_errors) / float(n_probable_correct)
+    if p_red > 0.05:
+        is_problem = True
+
+    return is_problem

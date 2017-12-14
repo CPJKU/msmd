@@ -37,7 +37,7 @@ from __future__ import print_function
 
 import argparse
 import logging
-
+import pprint
 import time
 from PyQt4 import QtCore, QtGui, Qt, uic
 
@@ -59,7 +59,7 @@ from sheet_manager.alignments import mung_midi_from_ly_links, \
     group_mungos_by_system, \
     group_mungos_by_system_paths, \
     build_system_mungos_on_page, \
-    align_score_to_performance, alignment_stats
+    align_score_to_performance, alignment_stats, is_aln_problem
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
 
@@ -89,7 +89,7 @@ TARGET_DIR = "/home/matthias/mounts/home@rechenknecht1/Data/sheet_localization/r
 # todo: remove this
 # PIECES = BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES
 
-tempo_ratios = [0.9, 1.0, 1.1]
+tempo_ratios = [1.0]
 sound_fonts = ["FluidR3_GM"]
 
 
@@ -299,6 +299,57 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.save_coords()
 
+        # Status report
+        page_stats, piece_stats = self.collect_stats()
+        return page_stats, piece_stats
+
+    def collect_stats(self):
+        """Collects various statistics about the piece."""
+        page_stats = {}
+        all_mungos = []
+        all_events = self.note_events
+        for page, mungos in enumerate(self.page_mungos):
+            all_mungos.extend(mungos)
+            events = self.page_note_events(page)
+
+            stats = alignment_stats(mungos, events,
+                                    self.score_performance_alignment)
+            page_stats[page] = stats
+
+        # Global statistics
+        piece_stats = alignment_stats(all_mungos, all_events,
+                                      self.score_performance_alignment)
+
+        return page_stats, piece_stats
+
+    def page_note_events(self, page):
+        """Returns the list of note events that we know should belong on
+        the given page, from the alignment. (This means that events at page
+        breaks might not be taken into account.)"""
+        mungos = self.page_mungos[page]
+
+        note_events = self.note_events
+        first_index = note_events.shape[0]
+        first_onset = np.inf
+        last_index = 0
+        last_onset = 0
+
+        for m in mungos:
+            if m.objid in self.score_performance_alignment:
+                e_idx = self.score_performance_alignment[m.objid]
+                e = note_events[e_idx]
+                e_onset = e[0]
+                if e_onset < first_onset:
+                    first_onset = e_onset
+                    first_index = e_idx
+                if e_onset > last_onset:
+                    last_onset = e_onset
+                    last_index = e_idx
+
+        page_event_dict = {e_idx: e for e_idx, e in enumerate(note_events)
+                           if first_onset <= e[0] <= last_onset}
+        return page_event_dict
+
     def load_piece(self, folder_name):
         """Given a piece folder, set the current state of SheetManager to this piece.
         If the folder does not exist, does nothing."""
@@ -422,7 +473,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.comboBox_performance.setCurrentIndex(0)
             self.update_current_performance()
 
-    def ly2pdf_and_midi(self):
+    def ly2pdf_and_midi(self, quiet=True):
         """Convert the LilyPond file to PDF and MIDI (which is done automatically, if the Ly
         file contains the \midi { } directive)."""
         self.normalize_ly()
@@ -454,6 +505,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         cmd = cmd_base + ' -o {0} '.format(pdf_path_nosuffix) \
               + cmd_options \
               + ' {0}'.format(self.lily_normalized_file)
+
+        if quiet:
+            cmd += ' &> /dev/null'
 
         # Run LilyPond here.
         os.system(cmd)
@@ -489,7 +543,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.piece.update()
         self._refresh_score_and_performance_selection()
 
-    def normalize_ly(self):
+    def normalize_ly(self, quiet=True):
         """ Converts lilypond file to absolute. There is a sanity check:
         if there are too many consecutive apostrophes in the output file,
         we assume that the file was already encoded as absolute, and keep
@@ -507,26 +561,33 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                                  lily_normalized_fname)
         os.system('cp {0} {1}'.format(self.lily_file, self.lily_normalized_file))
 
+        _quiet = ""
+        if quiet:
+            _quiet = " &> /dev/null"
+
         if not os.path.exists(self.lily_normalized_file):
             print('Initializing normalized LilyPond file {0} failed!')
             return
 
         # Update to current LilyPond version
-        convert_cmd = "convert-ly -e {0}".format(self.lily_normalized_file)
-        print('Normalizing LilyPond: updating syntax to latest possible'
-              ' version: {0}'.format(convert_cmd))
+        convert_cmd = "convert-ly -e {0}" \
+                      "".format(self.lily_normalized_file) + _quiet
+        logging.info('Normalizing LilyPond: updating syntax to latest possible'
+                     ' version: {0}'.format(convert_cmd))
         os.system(convert_cmd)
 
         # Translate to default pitch language?
-        translate_cmd = 'ly -i "translate english" {0}'.format(self.lily_normalized_file)
-        print('Normalizing LilyPond: translating pitch names: {0}'.format(translate_cmd))
+        translate_cmd = 'ly -i "translate english" {0}' \
+                        ''.format(self.lily_normalized_file) + _quiet
+        logging.info('Normalizing LilyPond: translating pitch names: {0}'
+                     ''.format(translate_cmd))
         os.system(translate_cmd)
 
         # Convert to absolute
         base_cmd = 'ly rel2abs'
-        cmd = base_cmd + ' -i {0}'.format(self.lily_normalized_file)
+        cmd = base_cmd + ' -i {0}'.format(self.lily_normalized_file) + _quiet
 
-        print('Normalizing LilyPond: moving to absolute: {0}'.format(cmd))
+        logging.info('Normalizing LilyPond: moving to absolute: {0}'.format(cmd))
         os.system(cmd)
 
         # Check if the normalization didn't produce an absurd number of apostrophes.
@@ -550,16 +611,20 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # Update the encodings dict to include the *.norm.ly file
         self.piece.update()
 
-    def pdf2img(self):
+    def pdf2img(self, quiet=True):
         """ Convert pdf file to image """
+        _quiet = ""
+        if quiet:
+            _quiet = " &> /dev/null"
 
         self.status_label.setText("Convert pdf to images ...")
-        os.system("rm tmp/*.png")
+        os.system("rm tmp/*.png" + _quiet)
         pdf_path = self.current_score.pdf_file
         # pdf_path = os.path.join(self.folder_name,
         #                         self.piece_name +
         #                         self.score_name + '.pdf')
-        cmd = "convert -density 150 %s -quality 90 tmp/page.png" % pdf_path
+        cmd = "convert -density 150 {0} -quality 90 tmp/page.png" \
+              "".format(pdf_path) + _quiet
         os.system(cmd)
 
         self.status_label.setText("Resizing images ...")
@@ -599,12 +664,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """Extracts notehead centroid coords and MuNG features
         from the PDF of the current Score. Saves them to the ``coords/``
         and ``mung/`` view."""
-        print("Extracting coords from pdf ...")
+        logging.info("Extracting coords from pdf ...")
         self.status_label.setText("Extracting coords from pdf ...")
 
         if not os.path.exists(self.pdf_file):
             self.status_label.setText("Extracting coords from pdf failed: PDF file not found!")
-            print("Extracting coords from pdf failed: PDF file not found: {0}".format(self.pdf_file))
+            logging.warning("Extracting coords from pdf failed: PDF file not found: {0}"
+                            "".format(self.pdf_file))
             return
 
         self.load_sheet()  # update_alignment=False)
@@ -613,8 +679,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         if n_pages == 0:
             self.status_label.setText("Extracting coords from pdf failed: could not find sheet!")
 
-            print("Extracting coords from pdf failed: could not find sheet!"
-                  " Generate the image files first.")
+            logging.warning("Extracting coords from pdf failed: could not find sheet!"
+                            " Generate the image files first.")
             return
 
         # Run PDF coordinate extraction
@@ -627,15 +693,17 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # Check that the PDF corresponds to the generated images...
         if len(centroids) != n_pages:
-            print("Something is wrong with the PDF vs. the generated images: page count"
-                  " does not match (PDF parser: {0} pages, images: {1})."
-                  " Re-generate the images from PDF.".format(len(centroids), n_pages))
+            logging.warning("Something is wrong with the PDF vs. the generated"
+                            " images: page count"
+                            " does not match (PDF parser: {0} pages,"
+                            " images: {1}). Re-generate the images from PDF."
+                            "".format(len(centroids), n_pages))
             return
 
         # Derive no. of pages from centroids
         for page_id in centroids:
-            print('Page {0}: {1} note events found'
-                  ''.format(page_id, centroids[page_id].shape[0]))
+            logging.info('Page {0}: {1} note events found'
+                         ''.format(page_id, centroids[page_id].shape[0]))
             self.page_coords[page_id] = centroids[page_id]
 
         # Save the coordinates
@@ -656,13 +724,14 @@ class SheetManager(QtGui.QMainWindow, form_class):
         system_mungo_groups = {}
         _system_start_objid = max([max([m.objid for m in ms])
                                    for ms in mungos.values()]) + 1
-        print('System objids will start from: {0}'.format(_system_start_objid))
+        logging.info('System objids will start from: {0}'
+                     ''.format(_system_start_objid))
 
         for i, page in enumerate(mungos.keys()):
-            print('Page {0}: total MuNG objects: {1}, with pitches: {2}'
-                  ''.format(page, len(mungos[page]),
-                            len([m for m in mungos[page]
-                                 if 'midi_pitch_code' in m.data])))
+            logging.info('Page {0}: total MuNG objects: {1}, with pitches: {2}'
+                         ''.format(page, len(mungos[page]),
+                                   len([m for m in mungos[page]
+                                        if 'midi_pitch_code' in m.data])))
             page_system_bboxes, page_system_mungo_groups = \
                 group_mungos_by_system_paths(
                     page_mungos=mungos[page],
@@ -687,11 +756,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.page_systems = [[] for _ in range(n_pages)]
         for page, bboxes in system_bboxes.items():
             corners = []
-            print('Page {0}: system bboxes = {1}'.format(page, bboxes))
+            logging.info('Page {0}: system bboxes = {1}'.format(page, bboxes))
             for t, l, b, r in bboxes:
                 corners.append([[t, l], [t, r], [b, r], [b, l]])
             corners_np = np.asarray(corners)
-            print('Corners shape: {0}'.format(corners_np.shape))
+            logging.debug('Corners shape: {0}'.format(corners_np.shape))
             self.page_systems[page] = corners_np
 
         # Save systems & refresh
@@ -1093,9 +1162,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self._page_centroids2mungo_map.append(mungo_centroids_map)
             self._page_mungo_centroids.append(np.asarray(mungo_centroids))
 
-        print('Page mungo centroids map sizes per page: {0}'
-              ''.format([len(self._page_centroids2mungo_map[i])
-                         for i in range(len(self.page_mungos))]))
+        logging.info('Page mungo centroids map sizes per page: {0}'
+                     ''.format([len(self._page_centroids2mungo_map[i])
+                                for i in range(len(self.page_mungos))]))
 
         # if update_alignment:
         self.update_mung_alignment()
@@ -1183,17 +1252,20 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 topRight = [r_min, width]
                 bottomLeft = [r_max, 0]
                 bottomRight = [r_max, width]
-                self.page_rois[i].append(np.asarray([topLeft, topRight, bottomRight, bottomLeft]))
+                self.page_rois[i].append(np.asarray([topLeft,
+                                                     topRight,
+                                                     bottomRight,
+                                                     bottomLeft]))
 
     def update_mung_alignment(self):
 
-        print('Updating MuNG alignment...')
+        logging.info('Updating MuNG alignment...')
         if self.page_mungos is None:
-            print('...no MuNG loaded!')
+            logging.info('...no MuNG loaded!')
             return None
         aln = align_score_to_performance(self.current_score,
                                          self.current_performance)
-        print('Total aligned pairs: {0}'.format(len(aln)))
+        logging.info('Total aligned pairs: {0}'.format(len(aln)))
         self.score_performance_alignment = {
             objid: note_idx
             for objid, note_idx in aln}
@@ -1213,6 +1285,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             page_stats = alignment_stats(mungos,
                                          self.note_events,
                                          self.score_performance_alignment)
+
             print('\tPage {0}: M+E {1}, M- {2}'
                   ''.format(i,
                             len(page_stats.mungos_aligned_correct_pitch),
@@ -1332,9 +1405,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.fig = plt.figure("Sheet Editor")
 
         # self.fig_manager = plt.get_current_fig_manager()
-        def notify_axes_change_print(fig):
-            print('Figure {0}: Axes changed!'.format(fig))
-        self.fig.add_axobserver(notify_axes_change_print)
+        # def notify_axes_change_print(fig):
+        #     print('Figure {0}: Axes changed!'.format(fig))
+        # self.fig.add_axobserver(notify_axes_change_print)
 
         # init events
         self.fig.canvas.mpl_connect('button_press_event', self.on_press)
@@ -1552,12 +1625,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """
         Sheet has been clicked event
         """
-        print('Calling: on_release, with event {0}'.format(event))
+        # print('Calling: on_release, with event {0}'.format(event))
         # Preserving the view/zoom history
         _prev_views = plt.gcf().canvas.toolbar._views._elements
         _prev_positions = plt.gcf().canvas.toolbar._positions._elements
-        print('...previous views: {0}'.format(_prev_views))
-        print('...previous positions: {0}'.format(_prev_positions))
+        # print('...previous views: {0}'.format(_prev_views))
+        # print('...previous positions: {0}'.format(_prev_positions))
 
         from sklearn.metrics.pairwise import pairwise_distances
 
@@ -1603,7 +1676,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 if 'midi_pitch_code' in mungo.data:
                     pitch = int(mungo.data['midi_pitch_code'])
 
-                print('Found closest mungo: {0}'.format(mungo))
+                logging.debug('Found closest mungo: {0}'.format(mungo))
                 try:
                     onset = self._mungo_onset_frame_for_current_performance(mungo)
                     _aln_onset, _aln_pitch = self._aligned_onset_and_pitch(mungo)
@@ -1617,7 +1690,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
             # If not, fall back coords ordering.
             if not mung_onset_successful:
-                print('...retrieving corresponding MuNG object not successful.')
+                logging.debug('...retrieving corresponding MuNG object not successful.')
 
                 dists = pairwise_distances(clicked, self.page_coords[page_id])
                 selection = np.argmin(dists)
@@ -1628,7 +1701,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
             
                 onset = self.onsets[selection]
 
-            print('Pitch: {0}, onset: {1}, aln_pitch: {2}'.format(pitch, onset, _aln_pitch))
+            logging.debug('Pitch: {0}, onset: {1}, aln_pitch: {2}'
+                          ''.format(pitch, onset, _aln_pitch))
 
             plt.plot([onset, onset], [0, self.spec.shape[0]], 'w-', linewidth=2.0, alpha=0.5)
 
@@ -1697,7 +1771,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
                     # remove system
                     self.page_systems[page_id] = np.delete(self.page_systems[page_id], i, axis=0)
-                    print("Removed system with id:", i)
+                    logging.info("Removed system with id:", i)
                     break
 
             self.systems_to_rois()
@@ -1739,7 +1813,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
             # remove coordinate
             self.page_bars[page_id] = np.delete(self.page_bars[page_id], selection, axis=0)
-            print("Removed bar with id:", selection)
+            logging.info("Removed bar with id:", selection)
 
         # add note position
         if self.radioButton_addNote.isChecked():
@@ -1762,7 +1836,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             
             # remove coordinate
             self.page_coords[page_id] = np.delete(self.page_coords[page_id], selection, axis=0)
-            print("Removed note with id:", selection)
+            logging.info("Removed note with id:", selection)
         
         # update sheet statistics
         self.update_sheet_statistics()
@@ -1790,7 +1864,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def init_omr(self):
         """ Initialize omr module """
-        print('Initializing omr ...')
+        logging.info('Initializing omr ...')
         self.status_label.setText("Initializing omr ...")
 
         # select model
@@ -1832,7 +1906,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """ Detect note heads in current image """
         from omr.utils.data import prepare_image
 
-        print('Detecting note heads ...')
+        logging.info('Detecting note heads ...')
         self.status_label.setText("Detecting note heads ...")
 
         if self.omr is None:
@@ -1861,7 +1935,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """ Detect bars in current image """
         from omr.utils.data import prepare_image
 
-        print('Detecting bars ...')
+        logging.info('Detecting bars ...')
         self.status_label.setText("Detecting bars ...")
 
         if self.omr is None:
@@ -1890,7 +1964,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """ Detect systems in current image """
         from omr.utils.data import prepare_image
 
-        print('Detecting systems ...')
+        logging.info('Detecting systems ...')
         self.status_label.setText("Detecting systems ...")
 
         if self.omr is None:
@@ -1976,6 +2050,9 @@ def build_argument_parser():
     parser.add_argument('-a', '--all', action='store_true',
                         help='[CLI] Process all the pieces in the data_dir.'
                              ' Equivalent to -p `ls $DATA_DIR`.')
+    parser.add_argument('--first_k', type=int, action='store', default=None,
+                        help='[CLI] Only process the frist K pieces in the data dir.'
+                             ' Equivalent to -p `ls $DATA_DIR | head -n $K`.')
     parser.add_argument('-c', '--config',
                         help='Load configuration from this file.')
     parser.add_argument('-f', '--force',
@@ -1985,6 +2062,9 @@ def build_argument_parser():
                         help='If set, will not stop when the Sheet Manager'
                              ' raises an error. Instead, it will simply skip'
                              ' over the piece that raised the error.')
+    parser.add_argument('--save_stats', action='store',
+                        help='Pickle the alignment statistics of the pieces'
+                             ' to this file.')
 
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Turn on INFO messages.')
@@ -2022,7 +2102,12 @@ def run_batch_mode(args):
 
     pieces = args.pieces
     if args.all:
-        pieces = os.listdir(data_dir)
+        pieces = [p for p in sorted(os.listdir(data_dir))
+                  if os.path.isdir(os.path.join(data_dir, p))]
+    elif args.first_k:
+        pieces = [p for p in sorted(os.listdir(data_dir))
+                  if os.path.isdir(os.path.join(data_dir, p))]
+        pieces = pieces[:args.first_k]
 
     piece_dirs = []
     for p in pieces:
@@ -2042,19 +2127,29 @@ def run_batch_mode(args):
     # Does not do mgr.show()!
     # app.exec_()
 
+    ##########################################################################
+
+    piece_stats = {}
     success_pieces = []
     failed_pieces = []
 
     _start_time = time.clock()
     _last_time = time.clock()
     for i, (piece, piece_dir) in enumerate(zip(pieces, piece_dirs)):
-        print('[{0}/{1}]\tProcessing piece: {2}'.format(i, len(pieces), piece))
+        print('\n\n---------------------------------------------------'
+              '\n[{0}/{1}]\tProcessing piece: {2}\n'
+              ''.format(i, len(pieces), piece))
 
         try:
-            mgr.process_piece(piece_dir, workflow="ly")
+            page_stats, global_stats = mgr.process_piece(piece_dir, workflow="ly")
 
-        except SheetManagerError as mgre:
-            print('SheetManagerError: {0}'.format(mgre.message))
+            piece_stats[piece] = page_stats, global_stats
+
+            success_pieces.append((piece, piece_dir))
+
+        except Exception as mgre:
+            print('Error: {0}'.format(mgre))
+
             failed_pieces.append((piece, piece_dir))
 
         _now = time.clock()
@@ -2062,7 +2157,63 @@ def run_batch_mode(args):
               ''.format(_now - _last_time, _now - _start_time))
         _last_time = _now
 
-    print('Processing finished!')
+    ##########################################################################
+
+    print('\n\nAlignment problems report:'
+          '==========================\n\n')
+    problem_alignment_pieces = []
+    for piece in piece_stats:
+        _has_problem = False
+        page_stats, global_stats = piece_stats[piece]
+        if is_aln_problem(global_stats):
+            _has_problem = True
+            print('\n{0}\n{1}\n\n'.format(piece, '-' * len(piece)))
+            print('-- Global alignment problem:')
+            print('\t{0} probably errors'
+                  ''.format(len(global_stats.mungos_not_aligned_not_tied)))
+            print('\t{0} probably correct'
+                  ''.format(len(global_stats.mungos_aligned_correct_pitch)))
+
+        problem_pages = []
+        for page in page_stats:
+            if is_aln_problem(page_stats[page]):
+                if not _has_problem:
+                    _has_problem = True
+                    print('\n{0}\n{1}\n\n'.format(piece, '-' * len(piece)))
+                problem_pages.append(page)
+
+        for page in problem_pages:
+            print('\n\t---- Page alignment problem: page {0}:'.format(page))
+            print('\t{0} probably errors'
+                  ''.format(len(page_stats[page].mungos_not_aligned_not_tied)))
+            print('\t{0} probably correct'
+                  ''.format(len(page_stats[page].mungos_aligned_correct_pitch)))
+
+        if _has_problem:
+            problem_alignment_pieces.append(piece)
+
+    ##########################################################################
+
+    print('\n\n')
+    print('Pieces processed successfully: {0}'.format(len(success_pieces)))
+    pprint.pprint(success_pieces)
+    print('\n\n')
+    print('Pieces failed: {0}'.format(len(failed_pieces)))
+    pprint.pprint(failed_pieces)
+    print('\n\n')
+    print('Pieces processed, but with problems in alignment: {0}'
+          ''.format(len(problem_alignment_pieces)))
+    pprint.pprint(problem_alignment_pieces)
+    print('\n\n')
+    n_successfully_aligned = len(piece_stats) - len(problem_alignment_pieces)
+    print('Pieces without alignment problems: {0}'
+          ''.format(n_successfully_aligned))
+    print('Success rate: {0:.2f}'
+          ''.format(float(n_successfully_aligned) / len(args.pieces)))
+
+    if args.save_stats:
+        with open(args.save_stats, 'wb') as hdl:
+            pickle.dump(piece_stats, hdl, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def _requested_interactive(args):

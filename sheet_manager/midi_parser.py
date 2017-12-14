@@ -7,7 +7,7 @@ Created on Thu Feb  4 10:02:37 2016
 Syntisize audio from midi and extract spectrogram annotations
 
 """
-
+import logging
 import os
 import glob
 import numpy as np
@@ -80,9 +80,9 @@ class MidiParser(object):
         # compute spectrogram
         Spec = None
         if audio_path is not None:
-            print('Computing spectrogram from audio path: {0}'.format(audio_path))
+            logging.info('Computing spectrogram from audio path: {0}'.format(audio_path))
             if not os.path.isfile(audio_path):
-                print('...audio file does not exist!')
+                logging.info('...audio file does not exist!')
 
             Spec = processor(audio_path).T
 
