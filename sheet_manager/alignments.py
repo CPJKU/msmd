@@ -26,6 +26,9 @@ import string
 
 import abjad
 import numpy
+
+from skimage.measure import regionprops
+
 from muscima.cropobject import cropobjects_merge_bbox, CropObject, link_cropobjects
 from muscima.graph import NotationGraph
 from muscima.inference_engine_constants import InferenceEngineConstants
@@ -67,9 +70,9 @@ class LilyPondLinkPitchParser(object):
     # NONRELEVANT_CHARS = list("{}()[]_~\\/=|<>.^!?0123456789#\"")
     # ...this one was deprecated, since we (a) need ties (~), (b)
     #    don't have to strip out durations.
-    NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-")
+    NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-\t")
 
-    STRICT_NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-~")
+    STRICT_NONRELEVANT_CHARS = list("{}()[]\\_/=|<>.^!?#\"%-~\t")
 
     TIE_CHAR = '~'
 
@@ -458,8 +461,8 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
 
         # If groups are finished:
         if (i != _i_prev) and (j != _j_prev):
-            #print('Next grouping: positions {0}, {1} -- groups:'
-            #      ' {2}, {3}'.format(i, j, _current_m_group, _current_e_group))
+            # print('Next grouping: positions {0}, {1} -- groups:'
+            #       ' {2}, {3}'.format(i, j, _current_m_group, _current_e_group))
             # Align items in groups
             sorted_m_group = sorted(_current_m_group,
                                     key=lambda _m: _m.data['midi_pitch_code'])
@@ -471,14 +474,14 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
 
             if len(sorted_m_group) > 2:
                 _frames = [int(numpy.ceil(_e[0] / 0.05)) for _e in sorted_e_group]
-                print('Matched column pitches, frame {2}:'
-                      '\n\tMuNG:   {0}'
-                      '\n\tEvents: {1}'.format(
+                logging.debug('Matched column pitches, frame {2}:'
+                              '\n\tMuNG:   {0}'
+                              '\n\tEvents: {1}'.format(
                     [_m.data['midi_pitch_code'] for _m in sorted_m_group],
                     [_e[1] for _e in sorted_e_group],
                     _frames[0]
                 ))
-                print('\tAln path: {0}'.format(c_path))
+                logging.debug('\tAln path: {0}'.format(c_path))
 
             for c_i, c_j in zip(c_path[0], c_path[1]):
                 # Only align MuNG object and event if their pitches match!
@@ -983,7 +986,7 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None,
 
         plt.plot(dividers_hproj, numpy.arange(dividers_hproj.shape[0]))
         if allowed_peaks_hproj is not None:
-            plt.plot(allowed_peaks_hproj, numpy.arange(dividers_hproj.shape[0]))
+            plt.plot(allowed_peaks_hproj * 100, numpy.arange(dividers_hproj.shape[0]))
         plt.show()
 
     # Now we find local peaks (or peak areas) of the projections.
@@ -1010,6 +1013,14 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None,
             ascending = False
 
     print('Peaks: {0}'.format(zip(peak_starts, peak_ends)))
+
+    if len(peak_starts) == 0:
+        # no peaks: only one system => all MuNG objects
+        # go into one system
+        t, l, b, r = cropobjects_merge_bbox(page_mungos)
+        return [(t, l, b, r)], [page_mungos]
+
+
     # Filter out very sharp peaks
     peak_starts, peak_ends = map(list, zip(*[(s, e)
                                              for s, e in zip(peak_starts, peak_ends)
@@ -1136,6 +1147,145 @@ def find_column_divider_regions(sorted_mungo_columns):
     return dividers
 
 
+def group_mungos_by_system_paths(page_mungos, score_img, page_num=None):
+    """Groups the MuNG objects (assumed only notes) by system using separating
+    paths. A separating path is a background-only path that connects the left
+    and right limit of the region in which the MuNG objects are.
+
+    The grouping algorithm finds all separating paths and uses the union of
+    the pixels belonging to these paths as a mask to divide
+    the image into system regions. All MuNG objects that fall within the same
+    system region are then grouped together.
+
+    Separating paths pixels are pixels of connected components of the (white)
+    background of the image region delimited by MuNG that touch both the left
+    and right edge of this region.
+    """
+    pt, pl, pb, pr = cropobjects_merge_bbox(page_mungos)
+    canvas = score_img[:pb, pl:pr]
+    import cv2
+    _, canvas_bin = cv2.threshold(canvas, 0, canvas.max(),
+                                 cv2.THRESH_BINARY+cv2.THRESH_OTSU)
+    _, labels = cv2.connectedComponents(canvas_bin, connectivity=8)
+    left_side_labels = set(labels[:, 0])
+    right_side_labels = set(labels[:, -1])
+    separating_labels = left_side_labels.intersection(right_side_labels)
+    # Filter out background label
+    if 0 in separating_labels:
+        separating_labels = [l for l in separating_labels if l != 0]
+
+    if len(separating_labels) == 0:
+        print('No separating path found!')
+
+    # # Find shortest paths for the separating labels
+    # for l in separating_labels:
+    #     pass
+
+    separated_region_mask = numpy.ones(labels.shape, dtype='uint8')
+    for l in separating_labels:
+        # Skip background
+        if l == 0:
+            continue
+        separated_region_mask[labels == l] = 0
+
+    _, system_labels = cv2.connectedComponents(separated_region_mask,
+                                               connectivity=8)
+
+    # Only retain as systems labels that connect from left to right.
+    left_side_system_labels = set(system_labels[:, 0])
+    right_side_system_labels = set(system_labels[:, -1])
+    separating_system_labels = left_side_system_labels.intersection(
+                                                right_side_system_labels)
+    separating_system_labels = [l for l in separating_system_labels if l != 0]
+    separating_syslabel_image = numpy.zeros(system_labels.shape, dtype='uint8')
+    for l in separating_system_labels:
+        separating_syslabel_image[system_labels == l] = l
+
+    # Those that do not should be assigned to the closest system.
+    non_separating_syslabel_image = system_labels * 1
+    for l in separating_system_labels:
+        non_separating_syslabel_image[non_separating_syslabel_image == l] = 0
+
+    non_separating_syslabel_assignment = dict()
+    regions = regionprops(non_separating_syslabel_image)
+    for r in regions:
+        rt, rl, rb, rr = r.bbox
+        dvert = 1
+        while ((rt - dvert) >= 0) or ((dvert + rb) < pb):
+            # We might hit the iteration limit in the top and bottom system
+            # on the page.
+            if (rt - dvert) >= 0:
+                upper_slice = separating_syslabel_image[rt - dvert, rl:rr]
+                upper_nnz = list(upper_slice[upper_slice.nonzero()])
+                if len(upper_nnz) > 0:
+                    # Assign to the found region & break
+                    separating_system_label = min(upper_nnz)
+                    non_separating_syslabel_assignment[r.label] = separating_system_label
+                    break
+
+            if (rb + dvert) < pb:
+                lower_slice = separating_syslabel_image[rb + dvert, rl:rr]
+                lower_nnz = list(lower_slice[lower_slice.nonzero()])
+                if len(lower_nnz) > 0:
+                    separating_system_label = min(lower_nnz)
+                    non_separating_syslabel_assignment[r.label] = separating_system_label
+                    break
+
+            dvert += 1
+
+    for nonsep_l, sep_l in non_separating_syslabel_assignment.items():
+        system_labels[system_labels == nonsep_l] = sep_l
+
+    # Now group the MuNG objects
+    system_groups = collections.defaultdict(list)
+    for m in page_mungos:
+        # DON'T translate MuNG-O bounding box top to canvas now:
+        ct, cl, cb, cr = m.top, m.left - pl, m.bottom, m.right - pl
+        # ct, cl, cb, cr = m.bounding_box
+        # Can use the MuNG-O mask to make the intersection more accurate,
+        # but this doesn't matter much for noteheads at 835 px page width.
+        # (It may matter down the road for other symbols.)
+        m_labels = set(list(system_labels[ct:cb, cl:cr].flatten()))
+        for l in m_labels:
+            if l != 0:
+                system_groups[l].append(m)
+
+    # Remove all background notes
+    if 0 in system_groups:
+        del system_groups[0]
+
+    # Extract just the groups themselves (decouple from original labels)
+    system_groups = system_groups.values()
+
+    # And create the regions:
+    system_bboxes = [cropobjects_merge_bbox(system_group)
+                     for system_group in system_groups]
+    # Transpose the bboxes w.r.t. original image is not necessary, because
+    # the group contains the original MuNG objects with coords w.r.t. page
+    # system_bboxes = [(st, sl + pl, sb, sr + pl)
+    #                  for st, sl, sb, sr in system_bboxes]
+    system_groups, system_bboxes = zip(*[(g, b)
+                                         for g, b, in sorted(zip(system_groups,
+                                                                 system_bboxes),
+                                                             key=lambda kv: kv[1])
+                                         if len(g) > 0])
+
+    # Debugging plot:
+    if page_num is not None:
+        import matplotlib
+        matplotlib.use('Qt4Agg')
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.imshow(canvas_bin, cmap='gray', interpolation='nearest')
+        _img_system_labels = system_labels * 1
+        _img_system_labels[_img_system_labels != 0] += 10
+        plt.imshow(_img_system_labels, interpolation='nearest', alpha=1.0)
+        plt.title('Detected system regions, page {0}'.format(page_num))
+        plt.show()
+
+    return system_bboxes, system_groups
+
+
 def build_system_mungos_on_page(system_boundaries, system_mungo_groups,
                                 start_objid):
     """Creates the ``staff`` MuNG objects from the given system
@@ -1146,6 +1296,8 @@ def build_system_mungos_on_page(system_boundaries, system_mungo_groups,
     system_mungs = []
     _current_objid = start_objid
     for sb, smg in zip(system_boundaries, system_mungo_groups):
+        if len(smg) == 0:
+            continue
         m = smg[0]
         uid = CropObject.build_uid(m.dataset,
                                    m.doc,
@@ -1167,3 +1319,106 @@ def build_system_mungos_on_page(system_boundaries, system_mungo_groups,
             link_cropobjects(m, system_mung, check_docname=False)
 
     return system_mungs
+
+
+def alignment_stats(mungos, events, aln):
+    """Compute the hits, misses, and tied misses for the given
+    MuNG -- Events alignment.
+
+    (You can call this per-page.)
+
+    The result can flag a suspicious piece, based on some criteria
+    on the stats.
+    """
+    mdict = {m.objid: m for m in mungos}
+    aln_dict = {objid: e_idx for objid, e_idx in aln.items()}
+    event_hits = [0 for _ in events]
+
+    n_mungos = len(mungos)
+    n_events = len(event_hits)
+    n_aln_pairs = len(aln)
+
+    mungos_not_aligned_not_tied = []
+    mungos_not_aligned_tied = []
+    mungos_aligned_wrong_pitch = []
+    mungos_aligned_correct_pitch = []
+    mungos_aligned_no_pitch = []
+    mungos_not_aligned_no_pitch = []
+
+    events_without_corresponding_mungo = []
+    events_with_multiple_mungos = []
+
+    system_mungos = []
+
+    for m in mungos:
+        if m.objid not in aln_dict:
+            if m.clsname == 'staff':
+                system_mungos.append(m)
+                continue
+
+            if ('tied' in m.data) and (m.data['tied'] == 1):
+                mungos_not_aligned_tied.append(m)
+            else:
+                mungos_not_aligned_not_tied.append(m)
+
+            if 'midi_pitch_code' not in m.data:
+                mungos_not_aligned_no_pitch.append(m)
+
+            continue
+
+        m_pitch = None
+        if 'midi_pitch_code' not in m.data:
+            mungos_aligned_no_pitch.append(m)
+        else:
+            m_pitch = m.data['midi_pitch_code']
+
+        e_idx = aln_dict[m.objid]
+        event_hits[e_idx] += 1
+
+        event = events[e_idx]
+        e_pitch = int(event[1])
+        e_onset_s = event[0]
+        e_onset_frame = notes_to_onsets([event], 1.0 / FPS)[0]
+
+        if m_pitch == e_pitch:
+            mungos_aligned_correct_pitch.append(m)
+        else:
+            mungos_aligned_wrong_pitch.append(m)
+
+    for e_idx, n_hits in enumerate(event_hits):
+        if n_hits == 0:
+            e = events[e_idx]
+            events_without_corresponding_mungo.append(e)
+        elif n_hits > 1:
+            e = events[e_idx]
+            events_with_multiple_mungos.append(e)
+
+    AlnStats = collections.namedtuple('AlnStats',
+                                      ['mungos_not_aligned_not_tied',
+                                       'mungos_not_aligned_tied',
+                                       'mungos_aligned_wrong_pitch',
+                                       'mungos_aligned_correct_pitch',
+                                       'mungos_aligned_no_pitch',
+                                       'mungos_not_aligned_no_pitch',
+                                       'events_without_corresponding_mungo',
+                                       'events_with_multiple_mungos',
+                                       'n_mungos',
+                                       'n_events',
+                                       'n_aln_pairs',
+                                       'system_mungos']
+                                      )
+
+    stats = AlnStats(mungos_not_aligned_not_tied=mungos_not_aligned_not_tied,
+                     mungos_not_aligned_tied=mungos_not_aligned_tied,
+                     mungos_aligned_wrong_pitch=mungos_aligned_wrong_pitch,
+                     mungos_aligned_correct_pitch=mungos_aligned_correct_pitch,
+                     mungos_aligned_no_pitch=mungos_aligned_no_pitch,
+                     mungos_not_aligned_no_pitch=mungos_not_aligned_no_pitch,
+                     events_without_corresponding_mungo=events_without_corresponding_mungo,
+                     events_with_multiple_mungos=events_with_multiple_mungos,
+                     n_mungos=n_mungos,
+                     n_events=n_events,
+                     n_aln_pairs=n_aln_pairs,
+                     system_mungos=system_mungos)
+
+    return stats

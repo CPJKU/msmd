@@ -55,8 +55,11 @@ import numpy as np
 # set backend to qt
 import matplotlib
 from muscima.io import export_cropobject_list, parse_cropobject_list
-from sheet_manager.alignments import mung_midi_from_ly_links, group_mungos_by_system, build_system_mungos_on_page, \
-    align_score_to_performance
+from sheet_manager.alignments import mung_midi_from_ly_links, \
+    group_mungos_by_system, \
+    group_mungos_by_system_paths, \
+    build_system_mungos_on_page, \
+    align_score_to_performance, alignment_stats
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
 
@@ -602,7 +605,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             print("Extracting coords from pdf failed: PDF file not found: {0}".format(self.pdf_file))
             return
 
-        self.load_sheet()
+        self.load_sheet()  # update_alignment=False)
 
         n_pages = len(self.page_coords)
         if n_pages == 0:
@@ -659,7 +662,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                             len([m for m in mungos[page]
                                  if 'midi_pitch_code' in m.data])))
             page_system_bboxes, page_system_mungo_groups = \
-                group_mungos_by_system(
+                group_mungos_by_system_paths(
                     page_mungos=mungos[page],
                     score_img=self.sheet_pages[i],
                     page_num=i+1
@@ -1027,7 +1030,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # self.parse_all_midis()
         # self.copy_sheets()
 
-    def load_sheet(self):
+    def load_sheet(self, update_alignment=True):
         """Load sheet images of current piece to prepare for OMR
         and/or coords editing.
         """
@@ -1065,7 +1068,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.status_label.setText("done!")
 
-    def load_mung(self):
+    def load_mung(self, update_alignment=True):
         """ Loads the Notation Graph representation. """
         if 'mung' not in self.current_score.views:
             print('Loading MuNG failed: notation graph not available!')
@@ -1092,6 +1095,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
               ''.format([len(self._page_centroids2mungo_map[i])
                          for i in range(len(self.page_mungos))]))
 
+        # if update_alignment:
         self.update_mung_alignment()
 
     def load_coords(self):
@@ -1203,6 +1207,14 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
                 m.data['{0}_onset_seconds'.format(_perf_name)] = e[0]
                 m.data['{0}_onset_frame'.format(_perf_name)] = int(onset_frame)
+
+            page_stats = alignment_stats(mungos,
+                                         self.note_events,
+                                         self.score_performance_alignment)
+            print('\tPage {0}: M+E {1}, M- {2}'
+                  ''.format(i,
+                            len(page_stats.mungos_aligned_correct_pitch),
+                            len(page_stats.mungos_not_aligned_not_tied)))
 
         self.save_mung()
 
@@ -1888,6 +1900,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # detect note heads
         self.page_systems[page_id] = self.omr.detect_systems(img)
+
+        # TODO: Propagate new systems to MuNG!
 
         # convert systems to rois
         self.systems_to_rois()

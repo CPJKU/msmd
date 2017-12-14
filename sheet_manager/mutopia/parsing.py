@@ -323,9 +323,9 @@ class MutopiaOpus(object):
             composer = os.path.basename(os.path.dirname(
                 os.path.normpath(self.root)))
             opus = os.path.basename(os.path.normpath(self.root))
-            name = '{0}___{1}___{2}'.format(composer,
-                                            opus,
-                                            basename)
+            name = '{0}__{1}__{2}'.format(composer,
+                                          opus,
+                                          basename)
             names.append(name)
         return names
 
