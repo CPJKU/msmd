@@ -82,7 +82,7 @@ class Score(object):
     @property
     def image_files(self):
         return [os.path.join(self.img_dir, img)
-                for img in os.listdir(self.img_dir)
+                for img in sorted(os.listdir(self.img_dir))
                 if not img.startswith('.')]
 
     def discover_pdf(self):
