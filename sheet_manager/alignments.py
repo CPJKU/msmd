@@ -1255,14 +1255,30 @@ def group_mungos_by_system_paths(page_mungos, score_img, page_num=None,
                 and (srr > (_c_width - CONNECTIVITY_TOLERANCE)):
             _is_system = True
 
-        if ((srb - srt) > (_c_height * 0.08)) \
-            and ((srr - srl) > _c_width * 0.5) \
+        if ((srb - srt) > (_c_height * 0.05)) \
+            and ((srr - srl) > (_c_width * 0.7)) \
                 and (sr.extent > 0.5) \
-                and (sr.area > (0.05 * _c_height * _c_width)):
+                and (sr.area > (0.03 * _c_height * _c_width)):
             _is_system = True
 
         if _is_system:
             separating_system_labels.append(sr.label)
+
+        else:
+            if _debugplot:
+                print('Rejecting candidate system region:'
+                      '\n\tbbox: {0}'
+                      '\n\tconnectivity L/R bounds: {1}'
+                      '\n\theight: {2}'
+                      '\n\twidth: {3}'
+                      '\n\textent: {4:.4f}'
+                      '\n\tarea: {5}'.format(sr.bbox,
+                                             (CONNECTIVITY_TOLERANCE,
+                                              _c_width - CONNECTIVITY_TOLERANCE),
+                                             srb - srt,
+                                             srr - srl,
+                                             sr.extent,
+                                             sr.area))
 
     # Only retain as systems labels that connect from left to right.
     # CONNECTIVITY_TOLERANCE = 10

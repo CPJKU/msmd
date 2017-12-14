@@ -2161,6 +2161,7 @@ def run_batch_mode(args):
 
     print('\n\nAlignment problems report:'
           '==========================\n\n')
+    n_useful_notes = 0
     problem_alignment_pieces = []
     for piece in piece_stats:
         _has_problem = False
@@ -2192,6 +2193,10 @@ def run_batch_mode(args):
         if _has_problem:
             problem_alignment_pieces.append(piece)
 
+        else:
+            n_useful_notes += len(global_stats.mungos_aligned_correct_pitch)
+
+
     ##########################################################################
 
     print('\n\n')
@@ -2210,6 +2215,8 @@ def run_batch_mode(args):
           ''.format(n_successfully_aligned))
     print('Success rate: {0:.2f}'
           ''.format(float(n_successfully_aligned) / len(args.pieces)))
+
+    print('\nUseful aligned notes: {0}'.format(n_useful_notes))
 
     if args.save_stats:
         with open(args.save_stats, 'wb') as hdl:
