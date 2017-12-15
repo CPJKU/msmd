@@ -90,6 +90,15 @@ def ties_have_spaces(lines):
     return output
 
 
+def point_and_click_active(lines):
+    """Makes sure point-and-click is not deactivated in the piece."""
+    output = []
+    for i, l in enumerate(lines):
+        output_line = re.sub(r'''#(ly:set-option \'point-and-click #f)''', '', l)
+        output.append(output_line)
+    return output
+
+
 def process_file(ly_file):
     ly_data = load_ly_lines(ly_file)
     with_includes = process_includes(ly_data,
@@ -97,7 +106,8 @@ def process_file(ly_file):
                                      join=False)
     no_unfolds = no_unfold_repeats(with_includes)
     spaced_ties = ties_have_spaces(no_unfolds)
-    return spaced_ties
+    with_point_and_click = point_and_click_active(spaced_ties)
+    return with_point_and_click
 
 ##############################################################################
 
