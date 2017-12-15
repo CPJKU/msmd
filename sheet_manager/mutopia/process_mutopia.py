@@ -10,7 +10,7 @@ This is necessary upon *extraction of the Mutopia file* to the Sheet
 Manager dataset, before the Sheet Manager processing pipeline does anything.
 """
 
-from __future__ import print_function, unicode_literals
+from __future__ import print_function
 
 import argparse
 import codecs
@@ -94,8 +94,10 @@ def point_and_click_active(lines):
     """Makes sure point-and-click is not deactivated in the piece."""
     output = []
     for i, l in enumerate(lines):
-        output_line = re.sub(r'''#(ly:set-option \'point-and-click #f)''', '', l)
+        output_line = re.sub('#\(ly:set\-option \'point\-and\-click #f\)', '', l)
         output.append(output_line)
+        if l != output_line:
+            logging.info('Found point-and-click deactivation on line {0}'.format(i))
     return output
 
 
