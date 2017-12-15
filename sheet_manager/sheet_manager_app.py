@@ -58,7 +58,10 @@ from muscima.io import export_cropobject_list, parse_cropobject_list
 from sheet_manager.alignments import group_mungos_by_system, \
     group_mungos_by_system_paths, \
     build_system_mungos_on_page, \
-    align_score_to_performance, alignment_stats, is_aln_problem
+    align_score_to_performance, \
+    alignment_stats, \
+    is_aln_problem, \
+    detect_system_regions_ly
 from sheet_manager.ly_parser import mung_midi_from_ly_links
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
@@ -2040,14 +2043,30 @@ class SheetManager(QtGui.QMainWindow, form_class):
             # detect note heads
             self.page_systems[page_id] = self.omr.detect_systems(img)
 
-            # TODO: Propagate new systems to MuNG!
-
             # convert systems to rois
             self.systems_to_rois()
 
         else:
-            pass
             # Insert the heuristic-based system region detection here
+            img = self.sheet_pages[page_id]
+            self.page_systems[page_id] = detect_system_regions_ly(img)
+            self.systems_to_rois()
+
+        # Propagate changes to MuNG systems!
+        # Assume that we have the same number of system MuNGs as there
+        # are detected system regions.
+        staff_mungos = [m for m in self.page_mungos[page_id]
+                        if m.clsname == 'staff']
+        sorted_regions = sorted(self.page_systems[page_id])
+        sorted_mungos = sorted(staff_mungos, key=lambda x: x.top)
+        for m, reg in zip(sorted_mungos, sorted_regions):
+            t, l, b, r = reg
+            m.x = t
+            m.y = l
+            m.height = b - t
+            m.width = r - l
+            m.to_integer_bounds()
+            m.mask = np.ones((m.height, m.width))
 
         # Update coords
         self.sort_bar_coords()

@@ -1200,3 +1200,39 @@ def is_aln_problem(stats):
         is_problem = True
 
     return is_problem
+
+
+def detect_system_regions_ly(image, verbose=False):
+    """Detects system regions based on stafflines. Assumes stafflines are
+    straight."""
+    import cv2
+    from skimage.measure import label, regionprops
+
+    image = (image <= 0.5).astype(numpy.uint8)
+    kernel_size = int(image.shape[1] * 0.7)
+    kernel = numpy.ones((1, kernel_size), dtype=numpy.uint8)
+    image = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+
+    label_img = label(image)
+    blobs = regionprops(label_img)
+
+    for g, blob in enumerate(blobs):
+        target_label = ((blob.label - 1) // 10) + 1
+        label_img[label_img == blob.label] = target_label
+
+    system_blobs = regionprops(label_img)
+    detected_systems = numpy.zeros((0, 4, 2))
+    for blob in system_blobs:
+        min_row, min_col, max_row, max_col = blob.bbox
+
+        # compile system coordinates
+        system_coords = numpy.zeros((4, 2))
+        system_coords[0] = numpy.asarray([min_row, min_col])
+        system_coords[1] = numpy.asarray([min_row, max_col])
+        system_coords[2] = numpy.asarray([max_row, max_col])
+        system_coords[3] = numpy.asarray([max_row, min_col])
+
+        detected_systems = numpy.concatenate((detected_systems,
+                                              system_coords[numpy.newaxis]))
+
+    return detected_systems
