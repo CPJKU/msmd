@@ -8,7 +8,7 @@ import sys
 import numpy
 
 # from pdfminer.psparser import PSKeyword, PSLiteral, LIT
-from pdfminer.pdfparser import PDFParser  # , PDFStreamParser
+from pdfminer.pdfparser import PDFParser, PDFStreamParser
 from pdfminer.pdfdocument import PDFDocument  # , PDFNoOutlines
 from pdfminer.pdftypes import PDFObjectNotFound  # , PDFValueError
 # from pdfminer.pdftypes import PDFStream, PDFObjRef, resolve1, stream_value
@@ -20,6 +20,7 @@ from muscima.cropobject import CropObject
 ESC_PAT = re.compile(r'[\000-\037&<>()"\042\047\134\177-\377]')
 def e(s):
     return ESC_PAT.sub(lambda m:'&#%d;' % ord(m.group(0)), s)
+
 
 __version__ = "0.0.1"
 
@@ -87,10 +88,11 @@ def parse_pdf(fname, target_width=None, with_links=False,
     fp = file(fname, 'rb')
 
     # ??? What was this doing here?
-    # pages = PDFPage.get_pages(fp)
-    # for page in pages:
-    #     parser = PDFStreamParser(page.contents[0].data)
-    #     break
+    pages = PDFPage.get_pages(fp)
+    for page in pages:
+        parser = PDFStreamParser(page.contents[0].data)
+        break
+
     parser = PDFParser(fp)
     doc = PDFDocument(parser)
 

@@ -270,7 +270,7 @@ class Piece(object):
         """Loads arbitrary YAML descriptors with the default name (meta.yml)."""
         metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
         if not os.path.isfile(metafile):
-            logging.warn('Piece {0} has no metadata file: {1}'
+            logging.info('Piece {0} has no metadata file: {1}'
                          ''.format(self.name, self.DEFAULT_META_FNAME))
             return dict()
 
@@ -328,8 +328,8 @@ class Piece(object):
         """
         if name in self.performances:
             if overwrite:
-                logging.warning('Piece {0}: performance {1} already exists,'
-                                ' overwriting!'.format(self.name, name))
+                logging.info('Piece {0}: performance {1} already exists,'
+                             ' overwriting!'.format(self.name, name))
                 time.sleep(5)
                 self.remove_performance(name)
             else:
@@ -390,8 +390,8 @@ class Piece(object):
         """
         if name in self.scores:
             if overwrite:
-                logging.warning('Piece {0}: performance {1} already exists,'
-                                ' overwriting!'.format(self.name, name))
+                logging.info('Piece {0}: performance {1} already exists,'
+                             ' overwriting!'.format(self.name, name))
                 time.sleep(5)
                 self.remove_score(name)
             else:

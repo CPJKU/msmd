@@ -113,6 +113,7 @@ def render_audio(input_midi_path, sound_font,
                  velocity=None,
                  change_tempo=True, tempo_ratio=None,
                  target_dir=None,
+                 quiet=True,
                  audio_fmt=".flac",
                  sound_font_root="~/.fluidsynth"):
     """
@@ -164,6 +165,9 @@ def render_audio(input_midi_path, sound_font,
     cmd = "fluidsynth -F %s -O s16 -T flac %s %s" % (audio_path,
                                                      sound_font_path,
                                                      perf_midi_path)
+    if quiet:
+        cmd += ' > /dev/null'
+
     os.system(cmd)
 
     return audio_path, perf_midi_path
