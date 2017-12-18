@@ -110,3 +110,11 @@ def greater_than_zero_intervals(a):
     absdiff = np.abs(np.diff(isntzero))
     ranges = np.where(absdiff == 1)[0].reshape(-1, 2)
     return ranges
+
+
+def corners2bbox(corners):
+    """Convert the corners representation of a region to
+    a bounding box."""
+    t, l = corners[0]
+    b, r = corners[2]
+    return t, l, b, r

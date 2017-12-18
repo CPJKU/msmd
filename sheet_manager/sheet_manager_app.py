@@ -73,7 +73,7 @@ from matplotlib.collections import PatchCollection
 
 form_class = uic.loadUiType("gui/main.ui")[0]
 
-from utils import sort_by_roi, natsort, get_target_shape
+from utils import sort_by_roi, natsort, get_target_shape, corners2bbox
 from pdf_parser import pdf2coords, parse_pdf
 from colormaps import cmaps
 
@@ -2057,8 +2057,18 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # are detected system regions.
         staff_mungos = [m for m in self.page_mungos[page_id]
                         if m.clsname == 'staff']
-        sorted_regions = sorted(self.page_systems[page_id])
         sorted_mungos = sorted(staff_mungos, key=lambda x: x.top)
+
+        # self.page_systems[page_id] are the *corners*...
+        sorted_regions = sorted([corners2bbox(c)
+                                 for c in self.page_systems[page_id]])
+        # print(sorted_regions)
+        if len(staff_mungos) != len(sorted_regions):
+            logging.warning('The number of systems detected by the OMR module'
+                            ' ({0}) does not match the number of LTR note'
+                            ' groups ({2}).'
+                            ''.format(len(staff_mungos),
+                                      len(sorted_regions)))
         for m, reg in zip(sorted_mungos, sorted_regions):
             t, l, b, r = reg
             m.x = t
@@ -2066,7 +2076,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
             m.height = b - t
             m.width = r - l
             m.to_integer_bounds()
-            m.mask = np.ones((m.height, m.width))
+            m.mask = np.ones((m.height, m.width), dtype='uint8')
+
+        # Update
+        self.save_mung()
 
         # Update coords
         self.sort_bar_coords()
@@ -2101,7 +2114,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         objid = mungo.objid
         if objid not in self.score_performance_alignment:
             return None, None
+
         event_idx = self.score_performance_alignment[objid]
+
         if self.note_events is None:
             return None, None
         if event_idx > self.note_events.shape[0]:

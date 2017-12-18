@@ -1208,12 +1208,18 @@ def detect_system_regions_ly(image, verbose=False):
     import cv2
     from skimage.measure import label, regionprops
 
-    image = (image <= 0.5).astype(numpy.uint8)
-    kernel_size = int(image.shape[1] * 0.7)
-    kernel = numpy.ones((1, kernel_size), dtype=numpy.uint8)
-    image = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+    _binarization_threshold = image.max() * 0.85
+    _kernel_width_coefficient = 0.6
 
-    label_img = label(image)
+    print('image max: {0}'.format(image.max()))
+
+    image = (image <= _binarization_threshold).astype(numpy.uint8)
+    kernel_size = int(image.shape[1] * _kernel_width_coefficient)
+    kernel = numpy.ones((1, kernel_size), dtype=numpy.uint8)
+
+    staffline_img = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)
+
+    label_img = label(staffline_img)
     blobs = regionprops(label_img)
 
     for g, blob in enumerate(blobs):
@@ -1221,6 +1227,18 @@ def detect_system_regions_ly(image, verbose=False):
         label_img[label_img == blob.label] = target_label
 
     system_blobs = regionprops(label_img)
+
+    if verbose:
+        import matplotlib
+        matplotlib.use('Qt4Agg')
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.title('System regions: {0}'.format(len(system_blobs)))
+        plt.imshow(image, cmap='gray', interpolation='nearest')
+        plt.imshow(staffline_img, cmap='gray', interpolation='nearest', alpha=0.7)
+        plt.imshow(label_img, alpha=0.4)
+        plt.show()
+
     detected_systems = numpy.zeros((0, 4, 2))
     for blob in system_blobs:
         min_row, min_col, max_row, max_col = blob.bbox
