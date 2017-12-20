@@ -344,7 +344,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         ############################
         # Detect systems
-        self.detect_systems()
+        for page_id in range(self.n_pages):
+            self.detect_systems_on_page(page_id, with_omr=False)
 
         self.save_coords()
 
@@ -2030,17 +2031,19 @@ class SheetManager(QtGui.QMainWindow, form_class):
             scores, or other scores where you can rely on stafflines being
             perfectly horizontal.
         """
-        from omr.utils.data import prepare_image
-
         logging.info('Detecting systems ...')
         self.status_label.setText("Detecting systems ...")
 
         page_id = self.spinBox_page.value()
+        self.detect_systems_on_page(page_id, with_omr=with_omr)
 
+    def detect_systems_on_page(self, page_id, with_omr):
+        """Detect systems on the given page."""
         if with_omr:
             if self.omr is None:
                 self.init_omr()
 
+            from omr.utils.data import prepare_image
             # prepare current image for detection
             img = prepare_image(self.sheet_pages[page_id])
 
