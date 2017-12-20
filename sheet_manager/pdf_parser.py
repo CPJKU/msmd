@@ -87,11 +87,11 @@ def parse_pdf(fname, target_width=None, with_links=False,
     page_no = -1
     fp = file(fname, 'rb')
 
-    # ??? What was this doing here?
-    pages = PDFPage.get_pages(fp)
-    for page in pages:
-        parser = PDFStreamParser(page.contents[0].data)
-        break
+    # # ??? What was this doing here?
+    # pages = PDFPage.get_pages(fp)
+    # for page in pages:
+    #     parser = PDFStreamParser(page.contents[0].data)
+    #     break
 
     parser = PDFParser(fp)
     doc = PDFDocument(parser)

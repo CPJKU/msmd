@@ -531,7 +531,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.comboBox_performance.setCurrentIndex(0)
             self.update_current_performance()
 
-    def ly2pdf_and_midi(self, quiet=True):
+    def ly2pdf_and_midi(self, quiet=False):
         """Convert the LilyPond file to PDF and MIDI (which is done automatically, if the Ly
         file contains the \midi { } directive)."""
         self.normalize_ly()
@@ -601,7 +601,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.piece.update()
         self._refresh_score_and_performance_selection()
 
-    def normalize_ly(self, quiet=True):
+    def normalize_ly(self, quiet=False):
         """ Converts lilypond file to absolute. There is a sanity check:
         if there are too many consecutive apostrophes in the output file,
         we assume that the file was already encoded as absolute, and keep
@@ -669,7 +669,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # Update the encodings dict to include the *.norm.ly file
         self.piece.update()
 
-    def pdf2img(self, quiet=True):
+    def pdf2img(self, quiet=False):
         """ Convert pdf file to image """
         _quiet = ""
         if quiet:
