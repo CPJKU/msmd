@@ -227,6 +227,22 @@ class Score(object):
         if not os.path.isdir(self.coords_dir):
             os.mkdir(self.coords_dir)
 
+    def load_mungos(self):
+        """Loads all the available MuNG objects as a list. You need to make
+        sure the objids don't clash across pages!"""
+        self.update()
+        if 'mung' not in self.views:
+            raise SheetManagerDBError('Score {0}: mung view not available!'
+                                      ''.format(self.name))
+        mung_files = self.view_files('mung')
+
+        mungos = []
+        for f in mung_files:
+            ms = parse_cropobject_list(f)
+            mungos.extend(ms)
+
+        return mungos
+
     def get_ordered_notes(self, filter_tied=False, reverse_columns=False,
                           return_columns=False):
         """Returns the MuNG objects corresponding to notes in the canonical
