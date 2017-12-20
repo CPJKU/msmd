@@ -227,7 +227,7 @@ class Score(object):
         if not os.path.isdir(self.coords_dir):
             os.mkdir(self.coords_dir)
 
-    def load_mungos(self):
+    def load_mungos(self, by_page=False):
         """Loads all the available MuNG objects as a list. You need to make
         sure the objids don't clash across pages!"""
         self.update()
@@ -239,8 +239,10 @@ class Score(object):
         mungos = []
         for f in mung_files:
             ms = parse_cropobject_list(f)
-            mungos.extend(ms)
-
+            if by_page:
+                mungos.append(ms)
+            else:
+                mungos.extend(ms)
         return mungos
 
     def get_ordered_notes(self, filter_tied=False, reverse_columns=False,
