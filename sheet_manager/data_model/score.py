@@ -7,6 +7,8 @@ import os
 import pprint
 import shutil
 import time
+
+import cv2
 import yaml
 from muscima.graph import NotationGraph
 from muscima.inference_engine_constants import InferenceEngineConstants
@@ -84,6 +86,10 @@ class Score(object):
         return [os.path.join(self.img_dir, img)
                 for img in sorted(os.listdir(self.img_dir))
                 if not img.startswith('.')]
+
+    def load_images(self):
+        images = [cv2.imread(f, 0) for f in self.image_files]
+        return images
 
     def discover_pdf(self):
         available_pdf_files = [f for f in os.listdir(self.folder)
