@@ -10,7 +10,7 @@ This is necessary upon *extraction of the Mutopia file* to the Sheet
 Manager dataset, before the Sheet Manager processing pipeline does anything.
 """
 
-from __future__ import print_function, unicode_literals
+from __future__ import print_function
 
 import argparse
 import codecs
@@ -90,6 +90,17 @@ def ties_have_spaces(lines):
     return output
 
 
+def point_and_click_active(lines):
+    """Makes sure point-and-click is not deactivated in the piece."""
+    output = []
+    for i, l in enumerate(lines):
+        output_line = re.sub('#\(ly:set\-option \'point\-and\-click #f\)', '', l)
+        output.append(output_line)
+        if l != output_line:
+            logging.info('Found point-and-click deactivation on line {0}'.format(i))
+    return output
+
+
 def process_file(ly_file):
     ly_data = load_ly_lines(ly_file)
     with_includes = process_includes(ly_data,
@@ -97,7 +108,8 @@ def process_file(ly_file):
                                      join=False)
     no_unfolds = no_unfold_repeats(with_includes)
     spaced_ties = ties_have_spaces(no_unfolds)
-    return spaced_ties
+    with_point_and_click = point_and_click_active(spaced_ties)
+    return with_point_and_click
 
 ##############################################################################
 

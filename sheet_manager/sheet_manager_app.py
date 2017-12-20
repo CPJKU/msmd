@@ -55,11 +55,14 @@ import numpy as np
 # set backend to qt
 import matplotlib
 from muscima.io import export_cropobject_list, parse_cropobject_list
-from sheet_manager.alignments import mung_midi_from_ly_links, \
-    group_mungos_by_system, \
+from sheet_manager.alignments import group_mungos_by_system, \
     group_mungos_by_system_paths, \
     build_system_mungos_on_page, \
-    align_score_to_performance, alignment_stats, is_aln_problem
+    align_score_to_performance, \
+    alignment_stats, \
+    is_aln_problem, \
+    detect_system_regions_ly
+from sheet_manager.ly_parser import mung_midi_from_ly_links
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
 
@@ -70,7 +73,7 @@ from matplotlib.collections import PatchCollection
 
 form_class = uic.loadUiType("gui/main.ui")[0]
 
-from utils import sort_by_roi, natsort, get_target_shape
+from utils import sort_by_roi, natsort, get_target_shape, corners2bbox
 from pdf_parser import pdf2coords, parse_pdf
 from colormaps import cmaps
 
@@ -143,6 +146,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.pushButton_extractPerformanceFeatures.clicked.connect(
             self.extract_performance_features)
         self.pushButton_audio2sheet.clicked.connect(self.match_audio2sheet)
+
+        self.pushButton_ClearState.clicked.connect(self.reset)
 
         # Editing coords
         self.pushButton_editCoords.clicked.connect(self.edit_coords)
@@ -226,6 +231,44 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.score_performance_alignment = None
         # Dict: objid --> event_idx
 
+    def reset(self):
+        """Resets the SheetManager back to its initial state."""
+        self.piece = None
+        self.current_score = None
+        self.current_performance = None
+        self.folder_name = None
+        self.piece_name = None
+        self.lily_file = None
+        self.mxml_file = None
+        self.midi_file = None
+        self.lily_normalized_file = None
+        self.fig = None
+        self.fig_manager = None
+        self.click_0 = None
+        self.click_1 = None
+        self.press = False
+        self.drawObjects = []
+        self.sheet_pages = None
+        self.page_coords = None
+        self.page_systems = None
+        self.page_rois = None
+        self.page_bars = None
+        self.page_mungos = None
+        self.score_name = None
+        self.pdf_file = None
+        self.sheet_folder = None
+        self.coord_folder = None
+        self.omr = None
+        self.axis_label_fs = 16
+        self.performance_name = None
+        self.midi_matrix = None
+        self.spec = None
+        self.onsets = None
+        self.note_events = None
+        self._page_mungo_centroids = None
+        self._page_centroids2mungo_map = None
+        self.score_performance_alignment = None
+
     def open_sheet(self):
         """Choose a piece directory to open through a dialog window.
         """
@@ -258,6 +301,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                     ' Use arguments workflow="ly" or "Ly". '
                                     ' (Got: workflow="{0}")'.format(workflow))
 
+        self.reset()
+
         self.load_piece(piece_folder)
 
         if is_workflow_ly and not self.lily_file:
@@ -276,9 +321,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # Audio
         self.render_audio()
         self.extract_performance_features()
-        self.load_performance_features()
 
         # Alignment
+        self.load_performance_features()
         self.load_sheet()
 
         # OMR
@@ -300,6 +345,19 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.save_coords()
 
         # Status report
+        page_stats, piece_stats = self.collect_stats()
+        return page_stats, piece_stats
+
+    def get_stats_of_piece(self, piece_folder):
+        """Assuming the given piece is finished, compute the stats."""
+        self.reset()
+
+        if not os.path.isdir(piece_folder):
+            raise SheetManagerError('Piece folder not found: {0}'
+                                    ''.format(piece_folder))
+        self.load_piece(piece_folder)
+        self.load_performance_features()
+        self.load_sheet()
         page_stats, piece_stats = self.collect_stats()
         return page_stats, piece_stats
 
@@ -1960,27 +2018,68 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.status_label.setText("done!")
 
-    def detect_systems(self):
-        """ Detect systems in current image """
+    def detect_systems(self, with_omr=False):
+        """ Detect system regions in current image.
+
+        :param with_omr: If set, will use the OMR convnets. If not set,
+            will use heuristics. The heuristics work on LilyPond-generated
+            scores, or other scores where you can rely on stafflines being
+            perfectly horizontal.
+        """
         from omr.utils.data import prepare_image
 
         logging.info('Detecting systems ...')
         self.status_label.setText("Detecting systems ...")
 
-        if self.omr is None:
-            self.init_omr()
-
-        # prepare current image for detection
         page_id = self.spinBox_page.value()
-        img = prepare_image(self.sheet_pages[page_id])
 
-        # detect note heads
-        self.page_systems[page_id] = self.omr.detect_systems(img)
+        if with_omr:
+            if self.omr is None:
+                self.init_omr()
 
-        # TODO: Propagate new systems to MuNG!
+            # prepare current image for detection
+            img = prepare_image(self.sheet_pages[page_id])
 
-        # convert systems to rois
-        self.systems_to_rois()
+            # detect note heads
+            self.page_systems[page_id] = self.omr.detect_systems(img)
+
+            # convert systems to rois
+            self.systems_to_rois()
+
+        else:
+            # Insert the heuristic-based system region detection here
+            img = self.sheet_pages[page_id]
+            self.page_systems[page_id] = detect_system_regions_ly(img)
+            self.systems_to_rois()
+
+        # Propagate changes to MuNG systems!
+        # Assume that we have the same number of system MuNGs as there
+        # are detected system regions.
+        staff_mungos = [m for m in self.page_mungos[page_id]
+                        if m.clsname == 'staff']
+        sorted_mungos = sorted(staff_mungos, key=lambda x: x.top)
+
+        # self.page_systems[page_id] are the *corners*...
+        sorted_regions = sorted([corners2bbox(c)
+                                 for c in self.page_systems[page_id]])
+        # print(sorted_regions)
+        if len(staff_mungos) != len(sorted_regions):
+            logging.warning('The number of systems detected by the OMR module'
+                            ' ({0}) does not match the number of LTR note'
+                            ' groups ({2}).'
+                            ''.format(len(staff_mungos),
+                                      len(sorted_regions)))
+        for m, reg in zip(sorted_mungos, sorted_regions):
+            t, l, b, r = reg
+            m.x = t
+            m.y = l
+            m.height = b - t
+            m.width = r - l
+            m.to_integer_bounds()
+            m.mask = np.ones((m.height, m.width), dtype='uint8')
+
+        # Update
+        self.save_mung()
 
         # Update coords
         self.sort_bar_coords()
@@ -2015,7 +2114,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         objid = mungo.objid
         if objid not in self.score_performance_alignment:
             return None, None
+
         event_idx = self.score_performance_alignment[objid]
+
         if self.note_events is None:
             return None, None
         if event_idx > self.note_events.shape[0]:
@@ -2065,6 +2166,9 @@ def build_argument_parser():
     parser.add_argument('--save_stats', action='store',
                         help='Pickle the alignment statistics of the pieces'
                              ' to this file.')
+    parser.add_argument('--stats_only', action='store_true',
+                        help='If set, assumes the pieces are already processed'
+                             ' and only reports the alignment stats.')
 
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Turn on INFO messages.')
@@ -2141,7 +2245,10 @@ def run_batch_mode(args):
               ''.format(i, len(pieces), piece))
 
         try:
-            page_stats, global_stats = mgr.process_piece(piece_dir, workflow="ly")
+            if args.stats_only:
+                page_stats, global_stats = mgr.get_stats_of_piece(piece_dir)
+            else:
+                page_stats, global_stats = mgr.process_piece(piece_dir, workflow="ly")
 
             piece_stats[piece] = page_stats, global_stats
 
