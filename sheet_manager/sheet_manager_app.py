@@ -342,6 +342,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # self.sort_bar_coords()
         # self.sort_note_coords()
 
+        ############################
+        # Detect systems
+        self.detect_systems()
+
         self.save_coords()
 
         # Status report
