@@ -1491,10 +1491,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
 
         # Preserving the view/zoom history
-        prev_toolbar = plt.gcf().canvas.toolbar
-        _prev_view_elements = copy.deepcopy(prev_toolbar._views._elements)
-        _prev_position_elements = [[tuple([eee.frozen() for eee in ee]) for ee in e]
-                           for e in prev_toolbar._positions._elements]
+        # prev_toolbar = plt.gcf().canvas.toolbar
+        # _prev_view_elements = copy.deepcopy(prev_toolbar._views._elements)
+        # _prev_position_elements = [[tuple([eee.frozen() for eee in ee]) for ee in e]
+        #                    for e in prev_toolbar._positions._elements]
         # _xypress = copy.deepcopy(prev_toolbar._xypress)  # the location and axis info at the time
         #                       # of the press
         # _idPress = copy.deepcopy(prev_toolbar._idPress)
@@ -1690,8 +1690,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """
         # print('Calling: on_release, with event {0}'.format(event))
         # Preserving the view/zoom history
-        _prev_views = plt.gcf().canvas.toolbar._views._elements
-        _prev_positions = plt.gcf().canvas.toolbar._positions._elements
+        # _prev_views = plt.gcf().canvas.toolbar._views._elements
+        # _prev_positions = plt.gcf().canvas.toolbar._positions._elements
         # print('...previous views: {0}'.format(_prev_views))
         # print('...previous positions: {0}'.format(_prev_positions))
 
