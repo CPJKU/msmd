@@ -1,4 +1,6 @@
 
+from __future__ import print_function
+
 import numpy as np
 import matplotlib.path as mplPath
 
@@ -91,10 +93,10 @@ def sort_by_roi(coords, rois):
 def natsort(l):
     """ natural sorting of file name strings """
     l = np.asarray(l)
-    print l
+    print(l)
     if len(l) > 1:
         sorted_idx = np.argsort([int(s.split("-")[1].split(".")[0]) for s in l])
-        print sorted_idx
+        print(sorted_idx)
         return l[sorted_idx]
     else:
         return l

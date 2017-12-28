@@ -8,7 +8,7 @@ import os
 import numpy
 import yaml
 
-from util import SheetManagerDBError, path2name
+from sheet_manager.data_model.util import SheetManagerDBError, path2name
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
