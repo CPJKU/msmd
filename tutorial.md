@@ -89,3 +89,106 @@ the score/performance generating pipeline encountered the error), recording
 them in a log. There are some 650+ piano pieces in Mutopia; running the whole
 pipeline with `--all` takes several hours, depending on your CPU, and it can
 of course be parallelized.
+
+
+Extracting alignment
+====================
+
+### give piece dir
+collection_dir = '/home/matthias/cp/data/msmd'
+piece_name = 'BachCPE__cpe-bach-rondo__cpe-bach-rondo'
+piece_dir = os.path.join(collection_dir, piece_name)
+
+app = QtGui.QApplication(sys.argv)
+mgr = SheetManager()
+
+# Piece loading
+
+from sheet_manager.data_model.piece import Piece
+piece = Piece(root=collection_dir, name=piece_name)
+score = piece.load_score(piece.available_scores[0])
+performance = piece.load_performance(piece.available_performances[0])
+
+# Running the alignment procedure
+
+from sheet_manager.alignments import align_score_to_performance
+alignment = align_score_to_performance(score, performance)
+
+
+
+# Inspect the alignemnt
+
+m_objid, e_idx = alignment[0]
+
+note_events = performance.load_note_events()
+mungos = score.load_mungos()
+mdict = {m.objid: m for m in mungos}
+
+
+# To retrieve also the page where the individual MuNGs are
+mungos_per_page = score.load_mungos(by_page=True)
+mungo_to_page = {}
+for i, ms in enumerate(mungos_per_page):
+	for m in ms:
+  	mungo_to_page[m.objid] = i
+
+
+
+m, e = mdict[m_objid], note_events[e_idx]
+# ...this is now the aligned pair of the MuNG object representing the note(head) in the score,
+#    and the MIDI note event.
+
+
+
+# Recording the alignment inside the MuNG objects: SheetManager.update_mung_alignment()
+# This stores the alignment persistently.
+onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
+m.data['{0}_onset_seconds'.format(performance.name)] = e[0]
+m.data['{0}_onset_frame'.format(performance.name)] = int(onset_frame)
+
+
+
+
+
+
+# Finding the position of a MuNG object in the images:
+m_page = mungo_to_page[m.objid]
+t, l, b, r = m.bounding_box   # Integers!
+cx, cy = m.middle
+
+
+# BTW: Minimal integer bounding box containing the floating-point bbox:
+it, il, ib, ir = CropObject.bbox_to_integer_bounds(ft, fl, fb, fr)
+
+
+images = score.load_images()
+img = images[m_page]
+
+
+
+### Compute system coordinates
+
+from sheet_music.alignments import detect_system_regions_ly
+systems_as_corners = detect_system_regions_ly(img)
+
+# To update the MuNG staff objects, see SheetManager.detect_systems() method.
+# Then, persist the MuNGs back to the score: see SheetManager.save_mung()
+
+
+
+
+# Getting the noteheads in one system:
+staff_noteheads = [mdict[i] for i in staff_mung.inlinks]
+
+
+
+
+
+### unroll all systems from all three pages to one very long system (adapt note coordinates)
+
+
+# load performance
+# load alignment
+# take onset/frame
+# onset points to ID in the notehead list
+
