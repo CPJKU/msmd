@@ -30,7 +30,7 @@ class Performance(object):
     # AUDIO_EXTENSIONS = ['flac', 'wav', 'mp3', 'ogg']
     AUDIO_NAMING_SEPARATOR = '_'
 
-    def __init__(self, folder, piece_name, audio_fmt='flac'):
+    def __init__(self, folder, piece_name, audio_fmt='flac', require_audio=True):
         """Initialize Performance.
 
         :param audio_fmt: The audio of the performance is expected
@@ -51,8 +51,12 @@ class Performance(object):
             audio_fmt = audio_fmt[1:]
         self.audio_fmt = audio_fmt
 
-        self.audio = self.discover_audio()
-        self.audio_name = path2name(self.audio)
+        if require_audio:
+            self.audio = self.discover_audio()
+            self.audio_name = path2name(self.audio)
+        else:
+            self.audio = None
+            self.audio_name = None
         self.midi = self.discover_midi()
 
         self.features_dir = os.path.join(self.folder, 'features')
@@ -164,6 +168,11 @@ class Performance(object):
     def discover_midi(self):
         """Based on the discovered audio, finds the performance
         MIDI (if available)."""
+
+        if self.audio is None:
+            # TODO: discover midi (file discovery helper)
+            return None
+
         midi_fname = os.path.splitext(self.audio)[0] + '.mid'
         if not os.path.isfile(midi_fname):
             midi_fname += 'i'

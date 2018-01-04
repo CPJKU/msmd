@@ -154,7 +154,7 @@ class Piece(object):
         """Returns a list of all the available Scores."""
         return [self.load_score(s) for s in self.available_scores]
 
-    def load_performance(self, performance_name):
+    def load_performance(self, performance_name, require_audio=True):
         """Creates a ``Performance`` object for the given performance
         and returns it."""
         self.update()
@@ -167,7 +167,8 @@ class Piece(object):
                                                 self.available_performances))
         performance_dir = self.performances[performance_name]
         performance = Performance(folder=performance_dir,
-                                  piece_name=self.name)
+                                  piece_name=self.name,
+                                  require_audio=require_audio)
         return performance
 
     def load_all_performances(self):

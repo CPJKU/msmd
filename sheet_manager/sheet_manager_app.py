@@ -84,17 +84,12 @@ from omr.utils.data import MOZART_PIECES, BACH_PIECES, HAYDN_PIECES, BEETHOVEN_P
 PIECES = MOZART_PIECES + BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES + STRAUSS_PIECES
 
 TARGET_DIR = "/home/matthias/mounts/home@rechenknecht1/Data/sheet_localization/real_music_sf"
-# TARGET_DIR = "/home/matthias/cp/data/sheet_localization/real_music_sf"
 
-#tempo_ratios = np.arange(0.9, 1.1, 0.025)  # [0.85, 0.9, 0.95, 1.0, 1.05, 1.1, 1.15]
-# sound_fonts = ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]  # ["Steinway"]  # ["Acoustic_Piano", "Unison", "FluidR3_GM", "Steinway"]
-# ["Steinway", "Acoustic_Piano", "Bright_Yamaha_Grand", "Unison", "Equinox_Grand_Pianos", "FluidR3_GM", "Premium_Grand_C7_24"]
-
-# todo: remove this
-# PIECES = BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES
-
-tempo_ratios = [1.0]
-sound_fonts = ["FluidR3_GM"]
+fixed_combinations = [(1.0, "ElectricPiano"), (1.0, "grand-piano-YDP-20160804")]
+tempo_ratios = [0.9, 0.95, 1.0, 1.05, 1.1]
+sound_fonts = ["acoustic_piano_imis_1", "ElectricPiano", "YamahaGrandPiano"]
+# tempo_ratios = [1.0]
+# sound_fonts = ["FluidR3_GM"]
 
 
 class SheetManagerError(Exception):
@@ -879,25 +874,35 @@ class SheetManager(QtGui.QMainWindow, form_class):
         if not performance_prefix:
             performance_prefix = self.piece.name
 
-        for ratio in tempo_ratios:
-            for sound_font in sound_fonts:
-                performance_name = performance_prefix \
-                                   + '_tempo-{0}'.format(int(1000 * ratio)) \
-                                   + '_{0}'.format(sound_font)
-                audio_file, perf_midi_file = render_audio(
-                    self.piece.encodings['midi'],
-                    sound_font=sound_font,
-                    tempo_ratio=ratio, velocity=None)
-                self.piece.add_performance(name=performance_name,
-                                           audio_file=audio_file,
-                                           midi_file=perf_midi_file,
-                                           overwrite=True)
-                self.piece.update()
-                self._refresh_score_and_performance_selection()
+        # TODO: think about this
+        # random set of audio augmentations
+        combinations = list(fixed_combinations)
+        while len(combinations) < 7:
+            comb = (np.random.choice(tempo_ratios[:]), np.random.choice(sound_fonts[:]))
+            if comb in combinations:
+                continue
+            combinations.append(comb)
 
-                # Cleanup!
-                os.unlink(audio_file)
-                os.unlink(perf_midi_file)
+        # for ratio in tempo_ratios:
+        #     for sound_font in sound_fonts:
+        for ratio, sound_font in combinations:
+            performance_name = performance_prefix \
+                               + '_tempo-{0}'.format(int(1000 * ratio)) \
+                               + '_{0}'.format(sound_font)
+            audio_file, perf_midi_file = render_audio(
+                self.piece.encodings['midi'],
+                sound_font=sound_font,
+                tempo_ratio=ratio, velocity=None)
+            self.piece.add_performance(name=performance_name,
+                                       audio_file=audio_file,
+                                       midi_file=perf_midi_file,
+                                       overwrite=True)
+            self.piece.update()
+            self._refresh_score_and_performance_selection()
+
+            # Cleanup!
+            os.unlink(audio_file)
+            os.unlink(perf_midi_file)
 
         self.status_label.setText("done!")
 
@@ -988,6 +993,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.midi_matrix = midi_matrix
             self.spec = spectrogram
             self.note_events = note_events
+
+            # TODO: think about this
+            os.unlink(audio_file_path)
 
         # pattern = self.folder_name + "/audio/*.mid*"
         # for midi_file_path in glob.glob(pattern):
@@ -2172,14 +2180,13 @@ def build_argument_parser():
                              ' raises an error. Instead, it will simply skip'
                              ' over the piece that raised the error.')
     parser.add_argument('--save_stats', action='store',
-                        help='Save lists of pieces () to '
-                             ' to this yaml file.')
+                        help='Pickle the alignment statistics of the pieces.')
     parser.add_argument('--stats_only', action='store_true',
                         help='If set, assumes the pieces are already processed'
                              ' and only reports the alignment stats.')
     parser.add_argument('--save_piece_lists', action='store',
-                        help='Pickle the alignment statistics of the pieces'
-                             ' (success, failed, problems) to this file.')
+                        help='Save lists of pieces to yaml file.'
+                             ' (success, failed, problems)')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Turn on INFO messages.')
     parser.add_argument('--debug', action='store_true',
@@ -2341,6 +2348,7 @@ def run_batch_mode(args):
 
     if args.save_piece_lists:
         pieces = dict()
+        # TODO: careful this list contains the pieces with alignment problems as well
         pieces["success"] = [p[0] for p in success_pieces]
         pieces["failed"] = [p[0] for p in failed_pieces]
         pieces["problems"] = problem_alignment_pieces

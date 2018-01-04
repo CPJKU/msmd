@@ -72,6 +72,17 @@ def set_velocity(filename_in, filename_out, velocity):
     midipy.write_midifile(filename_out, midifile)
 
 
+def set_program(filename_in, filename_out, program):
+    """
+    set instruments
+    """
+    import pretty_midi
+    midi_data = pretty_midi.PrettyMIDI(filename_in)
+    for instrument in midi_data.instruments:
+        instrument.program = program
+    midi_data.write(filename=filename_out)
+
+
 class TempoEvent:
     """
     Helper class for tempo events
@@ -181,10 +192,9 @@ if __name__ == '__main__':
     main
     """
 
-    sound_fonts = ["Acoustic_Piano", "Equinox_Grand_Pianos", "FluidR3_GM",
-                   "Steinway", "Unison"]
+    sound_fonts = ["Acoustic_Piano", "Equinox_Grand_Pianos", "FluidR3_GM", "Steinway", "Unison"]
 
-    sound_fonts = ["Acoustic_Piano"]
+    sound_fonts = ["FluidR3_GM"]
 
     # select tempo
     for bpm in [120]:
