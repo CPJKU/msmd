@@ -7,6 +7,8 @@ Created on Thu Feb  4 10:02:37 2016
 Syntisize audio from midi and extract spectrogram annotations
 
 """
+from __future__ import print_function
+
 import logging
 import os
 import glob
@@ -151,7 +153,7 @@ if __name__ == '__main__':
     # midi file
     pattern = "/home/matthias/cp/data/sheet_localization/real_music/Mozart_Piano_Sonata_No_16_Allegro/audio/*.midi"
     for midi_file_path in glob.glob(pattern):
-        print midi_file_path
+        print(midi_file_path)
 
         # get file names and directories
         directory = os.path.dirname(midi_file_path)

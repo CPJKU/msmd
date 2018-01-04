@@ -1222,6 +1222,13 @@ def detect_system_regions_ly(image, verbose=False):
     label_img = label(staffline_img)
     blobs = regionprops(label_img)
 
+    # todo: fix this properly. this is a bad hack
+    # sometimes there is a text bounding box in the bottom part of the image
+    n_system_blobs = len(blobs) // 5 * 5
+    for blob in blobs[n_system_blobs:]:
+        label_img[label_img == blob.label] = 0
+    blobs = regionprops(label_img)
+
     for g, blob in enumerate(blobs):
         target_label = ((blob.label - 1) // 10) + 1
         label_img[label_img == blob.label] = target_label

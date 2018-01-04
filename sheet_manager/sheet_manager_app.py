@@ -47,6 +47,7 @@ import cv2
 import glob
 import shutil
 import pickle
+import yaml
 import sys
 import warnings
 
@@ -2171,12 +2172,14 @@ def build_argument_parser():
                              ' raises an error. Instead, it will simply skip'
                              ' over the piece that raised the error.')
     parser.add_argument('--save_stats', action='store',
-                        help='Pickle the alignment statistics of the pieces'
-                             ' to this file.')
+                        help='Save lists of pieces () to '
+                             ' to this yaml file.')
     parser.add_argument('--stats_only', action='store_true',
                         help='If set, assumes the pieces are already processed'
                              ' and only reports the alignment stats.')
-
+    parser.add_argument('--save_piece_lists', action='store',
+                        help='Pickle the alignment statistics of the pieces'
+                             ' (success, failed, problems) to this file.')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Turn on INFO messages.')
     parser.add_argument('--debug', action='store_true',
@@ -2335,6 +2338,15 @@ def run_batch_mode(args):
     if args.save_stats:
         with open(args.save_stats, 'wb') as hdl:
             pickle.dump(piece_stats, hdl, protocol=pickle.HIGHEST_PROTOCOL)
+
+    if args.save_piece_lists:
+        pieces = dict()
+        pieces["success"] = [p[0] for p in success_pieces]
+        pieces["failed"] = [p[0] for p in failed_pieces]
+        pieces["problems"] = problem_alignment_pieces
+
+        with open(args.save_piece_lists, 'wb') as hdl:
+            yaml.dump(pieces, hdl, default_flow_style=False)
 
 
 def _requested_interactive(args):
