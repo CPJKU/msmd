@@ -1,0 +1,14 @@
+# bach_split
+train, validation, test split containing only bach pieces
+
+# bach_out_split
+test set contains bach pieces, train and validation contains remaining composers
+
+# all_split
+train, validation, test split over all composers
+
+# beethoven_out_split
+TODO ...
+
+# bach_split_small
+just for testing
