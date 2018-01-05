@@ -420,7 +420,7 @@ def munkres_align_snippet(mungos, events, _debugplot=False):
 
         if _debugplot:
             import matplotlib
-            matplotlib.use('Qt4Agg')
+            # matplotlib.use('Qt4Agg')
             import matplotlib.pyplot as plt
             plt.figure()
             plt.subplot(121)
@@ -687,7 +687,7 @@ def group_mungos_by_system(page_mungos, score_img=None, page_num=None,
     # or very close to maximal.
     if (score_img is not None) and (page_num is not None):
         import matplotlib
-        matplotlib.use('Qt4Agg')
+        # matplotlib.use('Qt4Agg')
         import matplotlib.pyplot as plt
         plt.figure()
         plt.imshow(score_img[:canvas_height, :canvas_width], cmap='gray')
@@ -1031,7 +1031,7 @@ def group_mungos_by_system_paths(page_mungos, score_img, page_num=None,
     # Debugging plot:
     if _debugplot:
         import matplotlib
-        matplotlib.use('Qt4Agg')
+        # matplotlib.use('Qt4Agg')
         import matplotlib.pyplot as plt
         plt.figure()
         plt.imshow(canvas_bin, cmap='gray', interpolation='nearest')
@@ -1255,7 +1255,7 @@ def detect_system_regions_ly(image, verbose=False):
 
     if verbose:
         import matplotlib
-        matplotlib.use('Qt4Agg')
+        # matplotlib.use('Qt4Agg')
         import matplotlib.pyplot as plt
         plt.figure()
         plt.title('System regions: {0}'.format(len(system_blobs)))

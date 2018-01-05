@@ -67,7 +67,7 @@ from sheet_manager.ly_parser import mung_midi_from_ly_links
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
 
-matplotlib.use('QT4Agg')
+# matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection

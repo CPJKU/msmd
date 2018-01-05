@@ -12,3 +12,4 @@ pdfminer
 python-ly>=0.9.4
 git+git://github.com/hajicj/muscima#egg=muscima
 abjad>=2.21
+scikit-image>=0.13
