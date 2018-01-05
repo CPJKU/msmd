@@ -136,7 +136,7 @@ class SheetManagerGui(QtGui.QMainWindow, form_class):
         self.pushButton_pdf2Coords.clicked.connect(mgr.pdf2coords)
         self.pushButton_renderAudio.clicked.connect(mgr.render_audio)
         self.pushButton_extractPerformanceFeatures.clicked.connect(
-            self.extract_performance_features)
+            mgr.extract_performance_features)
         self.pushButton_audio2sheet.clicked.connect(mgr.match_audio2sheet)
 
         self.pushButton_ClearState.clicked.connect(mgr.reset)
@@ -145,7 +145,7 @@ class SheetManagerGui(QtGui.QMainWindow, form_class):
         self.pushButton_editCoords.clicked.connect(mgr.edit_coords)
         self.pushButton_loadSheet.clicked.connect(mgr.load_sheet)
         self.pushButton_loadPerformanceFeatures.clicked.connect(
-            self.load_performance_features)
+            mgr.load_performance_features)
         self.pushButton_loadCoords.clicked.connect(mgr.load_coords)
         self.pushButton_saveCoords.clicked.connect(mgr.save_coords)
 
@@ -154,10 +154,10 @@ class SheetManagerGui(QtGui.QMainWindow, form_class):
         self.spinBox_page.valueChanged.connect(mgr.edit_coords)
 
         # Deprecated in favor of batch processing
-        self.pushButton_renderAllAudios.clicked.connect(mgr.render_all_audios)
-        self.pushButton_copySheets.clicked.connect(mgr.copy_sheets)
-        self.pushButton_prepareAll.clicked.connect(mgr.prepare_all_audio)
-        self.pushButton_parseAllMidis.clicked.connect(mgr.parse_all_midis)
+        # self.pushButton_renderAllAudios.clicked.connect(mgr.render_all_audios)
+        # self.pushButton_copySheets.clicked.connect(mgr.copy_sheets)
+        # self.pushButton_prepareAll.clicked.connect(mgr.prepare_all_audio)
+        # self.pushButton_parseAllMidis.clicked.connect(mgr.parse_all_midis)
 
         # Params for sheet editing: system bbox --> roi
         mgr.window_top = self.spinBox_window_top.value()
@@ -242,9 +242,9 @@ class SheetManager(object):
         self.interactive = interactive
 
         if self.interactive:
+            print('SheetManager: running in INTERACTIVE mode')
             self.gui = SheetManagerGui(parent=parent)
             self.gui.setup_bindings(self)
-            print('SheetManager: running in INTERACTIVE mode')
         else:
             self.gui = None
             print('SheetManager: running in BATCH mode')
@@ -293,7 +293,7 @@ class SheetManager(object):
 
         # piece root folder
         folder_name = str(QtGui.QFileDialog.getExistingDirectory(
-            self,
+            self.gui,
             "Select Sheet Music",
             "."))
         self.load_piece(folder_name=folder_name)
@@ -548,6 +548,19 @@ class SheetManager(object):
     def _refresh_score_and_performance_selection(self):
         """Synchronizes the selection of scores and performances.
         Tries to retain the previous score/performance."""
+        if not self.gui:
+            try:
+                self.set_current_score(self.piece.available_scores[0])
+            except KeyError:
+                print('Cannot update score: no score is available!')
+            try:
+                self.set_current_performance(self.piece.available_performances[0])
+            except KeyError:
+                print('Cannot update performance: no performance is available!')
+            return
+
+        # With GUI:
+
         old_score_idx = self.gui.comboBox_score.currentIndex()
         old_score = str(self.gui.comboBox_score.itemText(old_score_idx))
 
@@ -563,7 +576,7 @@ class SheetManager(object):
             self.gui.comboBox_score.setCurrentIndex(idx)
         else:
             self.gui.comboBox_score.setCurrentIndex(0)
-            self.gui.update_current_score()
+            self.update_current_score()
 
         self.gui.comboBox_performance.clear()
         self.gui.comboBox_performance.addItems(self.piece.available_performances)
@@ -718,15 +731,14 @@ class SheetManager(object):
         # Update the encodings dict to include the *.norm.ly file
         self.piece.update()
 
-    # rwx GUI
+    # r-x GUI
     def pdf2img(self, quiet=False):
         """ Convert pdf file to image """
         _quiet = ""
         if quiet:
             _quiet = " &> /dev/null"
 
-        if self.gui:
-            self.gui.status_label.setText("Convert pdf to images ...")
+        # self.gui.status_label.setText("Convert pdf to images ...")
 
         os.system("rm tmp/*.png" + _quiet)
         pdf_path = self.current_score.pdf_file
@@ -771,8 +783,7 @@ class SheetManager(object):
             if self.gui.checkBox_showSheet.isChecked():
                 plt.show()
 
-        if self.gui:
-            self.gui.status_label.setText("done!")
+        # self.gui.status_label.setText("done!")
 
     # rwx GUI
     def pdf2coords(self):
@@ -1118,7 +1129,7 @@ class SheetManager(object):
 
         # set number of onsets in gui
         if self.gui:
-            self.lineEdit_nOnsets.setText(str(len(self.onsets)))
+            self.gui.lineEdit_nOnsets.setText(str(len(self.onsets)))
 
     # -w- GUI
     def load_sheet(self, update_alignment=True):
@@ -1477,7 +1488,7 @@ class SheetManager(object):
         # print('---orig positions: {0}'.format(prev_toolbar._positions._elements))
 
         # get data of current page
-        page_id = self.spinBox_page.value()
+        page_id = self.gui.spinBox_page.value()
 
         self.fig.clf(keep_observers=True)
 
@@ -2197,13 +2208,13 @@ def launch_gui(args):
         logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
     app = QtGui.QApplication(sys.argv)
-    myWindow = SheetManager()
+    myWindow = SheetManager(interactive=True)
     if args.data_dir:
         if len(args.pieces) > 0:
             piece = args.pieces[0]
             piece_dir = os.path.join(args.data_dir, piece)
             myWindow.load_piece(piece_dir)
-    myWindow.show()
+    myWindow.gui.show()
     app.exec_()
 
 
@@ -2237,8 +2248,8 @@ def run_batch_mode(args):
         raise OSError('Config file does not exist: {0}'.format(config_file))
 
     # We need to initialize the app to give PyQT all the context it expects
-    app = QtGui.QApplication(sys.argv, False)
-    mgr = SheetManager(interactive=True)
+    # app = QtGui.QApplication(sys.argv, False)
+    mgr = SheetManager(interactive=False)
     # Does not do mgr.show()!
     # app.exec_()
 
