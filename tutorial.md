@@ -10,6 +10,13 @@ Start by getting Mutopia from GitHub:
     git clone https://github.com/MutopiaProject/MutopiaProject.git
 ```
 
+To replicate our experiments, you will need the same state of the repository:
+
+```
+    cd MutopiaProject
+    git checkout e325d76f7eb728aebff056822b286be8f6b06aac
+```
+
 Initialize the Mutopia data root var, which we'll be using in the rest of the
 tutorial:
 
@@ -89,6 +96,7 @@ the score/performance generating pipeline encountered the error), recording
 them in a log. There are some 650+ piano pieces in Mutopia; running the whole
 pipeline with `--all` takes several hours, depending on your CPU, and it can
 of course be parallelized.
+
 
 
 Extracting alignment
