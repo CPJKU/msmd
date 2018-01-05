@@ -14,13 +14,13 @@ from muscima.graph import NotationGraph
 from muscima.inference_engine_constants import InferenceEngineConstants
 from muscima.io import parse_cropobject_list
 
-from sheet_manager.data_model.util import SheetManagerDBError, path2name
+from sheet_manager.data_model.util import SheetManagerDBError, path2name, MSMDMetadataMixin
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
 
 
-class Score(object):
+class Score(MSMDMetadataMixin):
     """The Score class represents one score of a piece. Each score has a PDF file
     as an authority, and then several views:
 
@@ -43,6 +43,8 @@ class Score(object):
 
         :param piece_name: Name of the Piece to which the Score belongs.
         """
+        super(Score, self).__init__()
+
         if not os.path.isdir(folder):
             raise SheetManagerDBError('Score initialized with'
                                       ' non-existent directory: {0}'
@@ -68,6 +70,10 @@ class Score(object):
         self._ensure_directory_structure()
         self.metadata = self.load_metadata()
         self.views = self.collect_views()
+
+    @property
+    def metadata_folder(self):
+        return self.folder
 
     @property
     def n_pages(self):
@@ -213,19 +219,19 @@ class Score(object):
                 for v in os.listdir(self.folder)
                 if os.path.isdir(os.path.join(self.folder, v))}
 
-    def load_metadata(self):
-        """Loads arbitrary YAML descriptors with the default name (meta.yml).
-        """
-        metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
-        if not os.path.isfile(metafile):
-            logging.info('Score {0} has no metadata file: {1}'
-                         ''.format(self.name, self.DEFAULT_META_FNAME))
-            return dict()
-
-        with open(metafile, 'r') as hdl:
-            metadata = yaml.load_all(hdl)
-
-        return metadata
+    # def load_metadata(self):
+    #     """Loads arbitrary YAML descriptors with the default name (meta.yml).
+    #     """
+    #     metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
+    #     if not os.path.isfile(metafile):
+    #         logging.info('Score {0} has no metadata file: {1}'
+    #                      ''.format(self.name, self.DEFAULT_META_FNAME))
+    #         return dict()
+    #
+    #     with open(metafile, 'r') as hdl:
+    #         metadata = yaml.load_all(hdl)
+    #
+    #     return metadata
 
     def _ensure_directory_structure(self):
         if not os.path.isdir(self.img_dir):

@@ -13,13 +13,13 @@ import yaml
 
 from sheet_manager.data_model.performance import Performance
 from sheet_manager.data_model.score import Score
-from sheet_manager.data_model.util import SheetManagerDBError
+from sheet_manager.data_model.util import SheetManagerDBError, MSMDMetadataMixin
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
 
 
-class Piece(object):
+class Piece(MSMDMetadataMixin):
     """This class represents a single piece. The piece with all its
     scores, performances, encodings, etc. lives in the filesystem
     in a directory; this class is just an abstraction to make manipulating
@@ -81,6 +81,8 @@ class Piece(object):
             on this value. See ``AVAILABLE_ENCODINGS`` class attribute
             for a list of encodings which it is possible to specify.
         """
+        super(Piece, self).__init__()
+
         if not os.path.isdir(root):
             raise SheetManagerDBError('Collection root directory does not'
                                       ' exist: {0}'.format(root))
@@ -129,6 +131,11 @@ class Piece(object):
     @property
     def default_score_name(self):
         return self.name + '_' + self.authority_format
+
+    @property
+    def metadata_folder(self):
+        # Alias for the MSMDMetadataMixin
+        return self.folder
 
     def _ensure_piece_structure(self):
         """Creates the basic expected directory structure."""
@@ -267,18 +274,32 @@ class Piece(object):
 
         return encodings
 
-    def load_metadata(self):
-        """Loads arbitrary YAML descriptors with the default name (meta.yml)."""
-        metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
-        if not os.path.isfile(metafile):
-            logging.info('Piece {0} has no metadata file: {1}'
-                         ''.format(self.name, self.DEFAULT_META_FNAME))
-            return dict()
-
-        with open(metafile, 'r') as hdl:
-            metadata = yaml.load_all(hdl)
-
-        return metadata
+    # def load_metadata(self):
+    #     """Loads arbitrary YAML descriptors with the default name (meta.yml)."""
+    #     metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
+    #     if not os.path.isfile(metafile):
+    #         logging.info('Piece {0} has no metadata file: {1}'
+    #                      ''.format(self.name, self.DEFAULT_META_FNAME))
+    #         return dict()
+    #
+    #     with open(metafile, 'r') as hdl:
+    #         metadata = yaml.load_all(hdl)
+    #
+    #     return metadata
+    #
+    # def dump_metadata(self):
+    #     """Dumps the current metadata of the piece. Overwrites the current
+    #     metafile.
+    #
+    #     Because the performances are not loaded, we cannot dump their
+    #     metadata from here; it needs to be done on an as-needed basis.
+    #     """
+    #     if not self.metadata:
+    #         return
+    #
+    #     metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
+    #     with open(metafile, 'w') as hdl:
+    #         yaml.dump(self.metadata, hdl)
 
     def clear(self):
         """Removes all scores, performacnes, and non-authority

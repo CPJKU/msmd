@@ -8,13 +8,13 @@ import os
 import numpy
 import yaml
 
-from sheet_manager.data_model.util import SheetManagerDBError, path2name
+from sheet_manager.data_model.util import SheetManagerDBError, path2name, MSMDMetadataMixin
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
 
 
-class Performance(object):
+class Performance(MSMDMetadataMixin):
     """The Performance class represents one performance of a piece
     (live or synthetic). Each performance has:
 
@@ -37,6 +37,8 @@ class Performance(object):
         :param audio_fmt: The audio of the performance is expected
             to have this format.
         """
+        super(Performance, self).__init__()
+
         if not os.path.isdir(folder):
             raise SheetManagerDBError('Performance initialized with'
                                       ' non-existent directory: {0}'
@@ -63,6 +65,10 @@ class Performance(object):
         self._ensure_features_dir()
 
         self.features = self.collect_features()
+
+    @property
+    def metadata_folder(self):
+        return self.folder
 
     def update(self):
         self.audio = self.discover_audio()
@@ -246,18 +252,18 @@ class Performance(object):
 
         return midi_fname
 
-    def load_metadata(self):
-        """Loads arbitrary YAML descriptors with the default name (meta.yml)."""
-        metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
-        if not os.path.isfile(metafile):
-            logging.info('Performance {0} has no metadata file: {1}'
-                         ''.format(self.name, self.DEFAULT_META_FNAME))
-            return dict()
-
-        with open(metafile, 'r') as hdl:
-            metadata = yaml.load_all(hdl)
-
-        return metadata
+    # def load_metadata(self):
+    #     """Loads arbitrary YAML descriptors with the default name (meta.yml)."""
+    #     metafile = os.path.join(self.folder, self.DEFAULT_META_FNAME)
+    #     if not os.path.isfile(metafile):
+    #         logging.info('Performance {0} has no metadata file: {1}'
+    #                      ''.format(self.name, self.DEFAULT_META_FNAME))
+    #         return dict()
+    #
+    #     with open(metafile, 'r') as hdl:
+    #         metadata = yaml.load_all(hdl)
+    #
+    #     return metadata
 
     def load_feature(self, feature_name):
         """Loads the feature with the given name, if available
