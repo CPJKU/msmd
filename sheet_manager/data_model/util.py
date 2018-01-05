@@ -26,8 +26,8 @@ class MSMDMetadataMixin(object):
                          ' Returning empty dict.')
             return dict()
 
-        with open(metafile, 'r') as hdl:
-            metadata = yaml.load_all(hdl)
+        with open(metafile, 'rb') as hdl:
+            metadata = yaml.load(hdl)
 
         return metadata
 
@@ -35,7 +35,7 @@ class MSMDMetadataMixin(object):
         metafile = os.path.join(folder, self.META_FNAME)
         if not self.metadata:
             return
-        with open(metafile, 'w') as hdl:
+        with open(metafile, 'wb') as hdl:
             yaml.dump(self.metadata, hdl)
 
     def load_metadata(self):

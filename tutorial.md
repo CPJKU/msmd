@@ -115,7 +115,7 @@ mgr = SheetManager()
 from sheet_manager.data_model.piece import Piece
 piece = Piece(root=collection_dir, name=piece_name)
 score = piece.load_score(piece.available_scores[0])
-performance = piece.load_performance(piece.available_performances[0])
+performance = piece.load_performance(piece.available_performances[0], require_audio=False)
 
 # Running the alignment procedure
 

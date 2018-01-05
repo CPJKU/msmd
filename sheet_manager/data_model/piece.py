@@ -178,9 +178,11 @@ class Piece(MSMDMetadataMixin):
                                   **perf_kwargs)
         return performance
 
-    def load_all_performances(self):
-        """Returns a list of all the available Performances."""
-        return [self.load_performance(p) for p in self.available_performances]
+    def load_all_performances(self, **perf_kwargs):
+        """Returns a list of all the available Performances. You can pass
+        Performance initialization kwargs."""
+        return [self.load_performance(p, **perf_kwargs)
+                for p in self.available_performances]
 
     def update(self):
         """Refreshes the index of available performances
@@ -327,7 +329,7 @@ class Piece(MSMDMetadataMixin):
         shutil.rmtree(self.performances[name])
         self.update()
 
-    def add_performance(self, name, audio_file, midi_file=None,
+    def add_performance(self, name, audio_file=None, midi_file=None,
                         overwrite=False):
         """Creates a new performance in the piece from existing audio
         and optionally MIDI files.
@@ -339,7 +341,7 @@ class Piece(MSMDMetadataMixin):
 
         :param audio_file: The audio file for the performance. Will be copied
             into the newly created performance directory, with the filename
-            derived as the `name`` plus the format suffix. Required.
+            derived as the `name`` plus the format suffix.
 
         :param midi_file: The performance MIDI. Optional. Will be copied
             into the newly created performance directory. Same name convention
@@ -348,6 +350,9 @@ class Piece(MSMDMetadataMixin):
         :param overwrite: If true, if a performance with the given ``name``
             exists, will delete it.
         """
+        if (audio_file is None) and (midi_file is None):
+            raise ValueError('At least one of audio and midi files'
+                             ' has to be supplied to create a performance.')
         if name in self.performances:
             if overwrite:
                 logging.info('Piece {0}: performance {1} already exists,'
@@ -376,7 +381,9 @@ class Piece(MSMDMetadataMixin):
         self.update()
 
         # Test-load the Performance. Ensures folder structure initialization.
-        _ = self.load_performance(name)
+        _ = self.load_performance(name,
+                                  require_audio=(audio_file is not None),
+                                  require_midi=(midi_file is not None))
 
     def clear_scores(self):
         """Removes all scores of the piece. Use this carefully!"""

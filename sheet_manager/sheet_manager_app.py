@@ -170,6 +170,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.target_width = 835
         self.retain_audio = True  # By default, the manager generates everything
+        self.n_augmentation_performances = 7
 
         if not os.path.exists("tmp"):
             os.mkdir("tmp")
@@ -349,6 +350,15 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # Status report
         page_stats, piece_stats = self.collect_stats()
+
+        # Log to metadata
+        self.piece.metadata['n_pages'] = self.n_pages
+        self.piece.metadata['n_performances'] = len(self.piece.performances)
+        self.piece.metadata['n_scores'] = len(self.piece.scores)
+        self.piece.metadata['aln_page_stats'] = dict(page_stats)
+        self.piece.metadata['aln_piece_stats'] = dict(piece_stats)
+        self.piece.dump_metadata()
+
         return page_stats, piece_stats
 
     def get_stats_of_piece(self, piece_folder):
@@ -863,7 +873,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         os.system("cp tmp/tmp.midi %s" % self.midi_file)
         self.lineEdit_midi.setText(self.midi_file)
 
-    def render_audio(self, performance_prefix=""):
+    def render_audio(self, performance_prefix="", clear_previous_performances=False):
         """
         Render audio from midi.
         """
@@ -881,11 +891,14 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # TODO: think about this
         # random set of audio augmentations
         combinations = list(fixed_combinations)
-        while len(combinations) < 7:
+        while len(combinations) < len(fixed_combinations) + self.n_augmentation_performances:
             comb = (np.random.choice(tempo_ratios[:]), np.random.choice(sound_fonts[:]))
             if comb in combinations:
                 continue
             combinations.append(comb)
+
+        if clear_previous_performances:
+            self.piece.clear_performances()
 
         # for ratio in tempo_ratios:
         #     for sound_font in sound_fonts:
@@ -973,7 +986,16 @@ class SheetManager(QtGui.QMainWindow, form_class):
         #  - load performance audio
         #  - compute performance spectrogram
         #  = save spectrogram as perf. feature
-        for performance in self.piece.load_all_performances():
+        print('Parsing performance midi files and audio...')
+        for performance in self.piece.load_all_performances(require_audio=False,
+                                                            require_midi=True):
+
+            if performance.audio is None:
+                logging.info('Performance {0} has no audio, skipping'
+                             ' performance feature extraction.'
+                             ''.format(performance.name))
+                continue
+
             audio_file_path = performance.audio
             midi_file_path = performance.midi
             if not os.path.isfile(midi_file_path):
@@ -998,7 +1020,6 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.spec = spectrogram
             self.note_events = note_events
 
-            # TODO: think about this
             if not retain_audio:
                 os.unlink(audio_file_path)
 
@@ -2183,6 +2204,9 @@ def build_argument_parser():
                              ' Note that this makes the dataset *HUGE* when'
                              ' performance augmentations are done with'
                              ' multiple soundfonts and tempo settings.')
+    parser.add_argument('--n_augmentation_performances', type=int, default=0,
+                        help='How many performances to render beyond '
+                             ' the fixed combinations.')
 
     parser.add_argument('-c', '--config',
                         help='Load configuration from this file. [NOT IMPLEMENTED]')
@@ -2267,6 +2291,7 @@ def run_batch_mode(args):
     #####################
     # Set up the mgr. settings
     mgr.retain_audio = args.retain_audio
+    mgr.n_augmentation_performances = args.n_augmentation_performances
 
     ##########################################################################
 
@@ -2290,11 +2315,22 @@ def run_batch_mode(args):
             piece_stats[piece] = page_stats, global_stats
 
             success_pieces.append((piece, piece_dir))
+            mgr.piece.metadata['processed'] = True
+            if any(is_aln_problem(stats) for stats in page_stats.values()):
+                mgr.piece.metadata['aligned_well'] = False
+            elif is_aln_problem(global_stats):
+                mgr.piece.metadata['aligned_well'] = False
+            else:
+                mgr.piece.metadata['aligned_well'] = True
+            mgr.piece.dump_metadata()
 
         except Exception as mgre:
             print('Error: {0}'.format(mgre))
 
             failed_pieces.append((piece, piece_dir))
+            mgr.piece.metadata['processed'] = False
+            mgr.piece.metadata['aligned_well'] = False
+            mgr.piece.dump_metadata()
 
         _now = time.clock()
         print('... {0:.2f} s (Total time expired: {1:.2f} s)'

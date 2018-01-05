@@ -195,9 +195,9 @@ class Performance(MSMDMetadataMixin):
     def discover_audio(self, required=False):
         """Looks for audio files in the performance directory.
 
-        If no audio with the format specified for the Performance
-        (by default: ``*.flac``) is discovered, will raise
-        a ``SheetManagerDBError``.
+        :param required: If no audio with the format specified for
+            the Performance (by default: ``*.flac``) is discovered,
+            will raise a ``SheetManagerDBError``.
         """
         candidate_files = self._discover_candidate_files(self.audio_fmt)
         #
