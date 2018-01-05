@@ -244,8 +244,10 @@ class SheetManager(object):
         if self.interactive:
             self.gui = SheetManagerGui(parent=parent)
             self.gui.setup_bindings(self)
+            print('SheetManager: running in INTERACTIVE mode')
         else:
             self.gui = None
+            print('SheetManager: running in BATCH mode')
 
     def reset(self):
         """Resets the SheetManager back to its initial state."""
