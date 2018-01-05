@@ -79,11 +79,10 @@ from pdf_parser import pdf2coords, parse_pdf
 from colormaps import cmaps
 
 from midi_parser import MidiParser, notes_to_onsets, FPS
-from omr.config.settings import DATA_ROOT as ROOT_DIR
-from omr.utils.data import MOZART_PIECES, BACH_PIECES, HAYDN_PIECES, BEETHOVEN_PIECES, CHOPIN_PIECES, SCHUBERT_PIECES, STRAUSS_PIECES
-PIECES = MOZART_PIECES + BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES + STRAUSS_PIECES
-
-TARGET_DIR = "/home/matthias/mounts/home@rechenknecht1/Data/sheet_localization/real_music_sf"
+# from omr.config.settings import DATA_ROOT as ROOT_DIR
+# from omr.utils.data import MOZART_PIECES, BACH_PIECES, HAYDN_PIECES, BEETHOVEN_PIECES, CHOPIN_PIECES, SCHUBERT_PIECES, STRAUSS_PIECES
+# PIECES = MOZART_PIECES + BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES + STRAUSS_PIECES
+# TARGET_DIR = "/home/matthias/mounts/home@rechenknecht1/Data/sheet_localization/real_music_sf"
 
 # Audio augmentation settings:
 #  - fixed SF and tempo combinations for no-aug. training and evaluation,
@@ -1969,11 +1968,15 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("Initializing omr ...")
 
         # select model
-        from omr.models import note_detector as note_model
-        from omr.models import bar_detector as bar_model
-        from omr.models import system_detector as system_model
-        from lasagne_wrapper.network import SegmentationNetwork
-        from omr.omr_app import OpticalMusicRecognizer
+        try:
+            from omr.models import note_detector as note_model
+            from omr.models import bar_detector as bar_model
+            from omr.models import system_detector as system_model
+            from lasagne_wrapper.network import SegmentationNetwork
+            from omr.omr_app import OpticalMusicRecognizer
+        except ImportError:
+            logging.warn('OMR not available!')
+            return
 
         # initialize note detection neural network
         dump_file = os.path.join(os.path.dirname(__file__),
@@ -2005,7 +2008,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def detect_note_heads(self):
         """ Detect note heads in current image """
-        from omr.utils.data import prepare_image
+        try:
+            from omr.utils.data import prepare_image
+        except ImportError:
+            logging.warning('OMR not available!')
+            return
 
         logging.info('Detecting note heads ...')
         self.status_label.setText("Detecting note heads ...")
@@ -2034,7 +2041,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def detect_bars(self):
         """ Detect bars in current image """
-        from omr.utils.data import prepare_image
+        try:
+            from omr.utils.data import prepare_image
+        except ImportError:
+            logging.warn('OMR not available!')
+            return
 
         logging.info('Detecting bars ...')
         self.status_label.setText("Detecting bars ...")
@@ -2081,7 +2092,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
             if self.omr is None:
                 self.init_omr()
 
-            from omr.utils.data import prepare_image
+            try:
+                from omr.utils.data import prepare_image
+            except ImportError:
+                logging.warn('OMR not available!')
+                return
+
             # prepare current image for detection
             img = prepare_image(self.sheet_pages[page_id])
 
