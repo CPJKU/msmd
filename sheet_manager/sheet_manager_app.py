@@ -102,70 +102,73 @@ class SheetManager(QtGui.QMainWindow, form_class):
     The workflow is wrapped in the ``process_piece()`` method.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, interactive=True):
         """
         Constructor
         """
 
-        QtGui.QMainWindow.__init__(self, parent)
-        self.setupUi(self)
-        
-        # set up status bar
-        self.status_label = QtGui.QLabel("")
-        self.statusbar.addWidget(self.status_label)
-        
-        # connect to menu
-        self.actionOpen_sheet.triggered.connect(self.open_sheet)
-        self.pushButton_open.clicked.connect(self.open_sheet)
+        if interactive:
+            QtGui.QMainWindow.__init__(self, parent)
+            self.setupUi(self)
 
-        self.comboBox_score.activated.connect(self.update_current_score)
-        self.comboBox_performance.activated.connect(self.update_current_performance)
+            # set up status bar
+            self.status_label = QtGui.QLabel("")
+            self.statusbar.addWidget(self.status_label)
 
-        # connect to omr menu
-        self.actionInit.triggered.connect(self.init_omr)
-        self.actionDetect_note_heads.triggered.connect(self.detect_note_heads)
-        self.actionDetect_systems.triggered.connect(self.detect_systems)
-        self.actionDetect_bars.triggered.connect(self.detect_bars)
+            # connect to menu
+            self.actionOpen_sheet.triggered.connect(self.open_sheet)
+            self.pushButton_open.clicked.connect(self.open_sheet)
 
-        # connect to check boxes
-        self.checkBox_showCoords.stateChanged.connect(self.plot_sheet)
-        self.checkBox_showRois.stateChanged.connect(self.plot_sheet)
-        self.checkBox_showSystems.stateChanged.connect(self.plot_sheet)
-        self.checkBox_showBars.stateChanged.connect(self.plot_sheet)
+            self.comboBox_score.activated.connect(self.update_current_score)
+            self.comboBox_performance.activated.connect(self.update_current_performance)
 
-        # Workflow for generating
-        self.pushButton_mxml2midi.clicked.connect(self.mxml2midi)
-        self.pushButton_ly2PdfMidi.clicked.connect(self.ly2pdf_and_midi)
-        self.pushButton_pdf2Img.clicked.connect(self.pdf2img)
-        self.pushButton_pdf2Coords.clicked.connect(self.pdf2coords)
-        self.pushButton_renderAudio.clicked.connect(self.render_audio)
-        self.pushButton_extractPerformanceFeatures.clicked.connect(
-            self.extract_performance_features)
-        self.pushButton_audio2sheet.clicked.connect(self.match_audio2sheet)
+            # connect to omr menu
+            self.actionInit.triggered.connect(self.init_omr)
+            self.actionDetect_note_heads.triggered.connect(self.detect_note_heads)
+            self.actionDetect_systems.triggered.connect(self.detect_systems)
+            self.actionDetect_bars.triggered.connect(self.detect_bars)
 
-        self.pushButton_ClearState.clicked.connect(self.reset)
+            # connect to check boxes
+            self.checkBox_showCoords.stateChanged.connect(self.plot_sheet)
+            self.checkBox_showRois.stateChanged.connect(self.plot_sheet)
+            self.checkBox_showSystems.stateChanged.connect(self.plot_sheet)
+            self.checkBox_showBars.stateChanged.connect(self.plot_sheet)
 
-        # Editing coords
-        self.pushButton_editCoords.clicked.connect(self.edit_coords)
-        self.pushButton_loadSheet.clicked.connect(self.load_sheet)
-        self.pushButton_loadPerformanceFeatures.clicked.connect(
-            self.load_performance_features)
-        self.pushButton_loadCoords.clicked.connect(self.load_coords)
-        self.pushButton_saveCoords.clicked.connect(self.save_coords)
+            # Workflow for generating
+            self.pushButton_mxml2midi.clicked.connect(self.mxml2midi)
+            self.pushButton_ly2PdfMidi.clicked.connect(self.ly2pdf_and_midi)
+            self.pushButton_pdf2Img.clicked.connect(self.pdf2img)
+            self.pushButton_pdf2Coords.clicked.connect(self.pdf2coords)
+            self.pushButton_renderAudio.clicked.connect(self.render_audio)
+            self.pushButton_extractPerformanceFeatures.clicked.connect(
+                self.extract_performance_features)
+            self.pushButton_audio2sheet.clicked.connect(self.match_audio2sheet)
 
-        self.spinBox_window_top.valueChanged.connect(self.update_staff_windows)
-        self.spinBox_window_bottom.valueChanged.connect(self.update_staff_windows)
-        self.spinBox_page.valueChanged.connect(self.edit_coords)
+            self.pushButton_ClearState.clicked.connect(self.reset)
 
-        # Deprecated in favor of batch processing
-        self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
-        self.pushButton_copySheets.clicked.connect(self.copy_sheets)
-        self.pushButton_prepareAll.clicked.connect(self.prepare_all_audio)
-        self.pushButton_parseAllMidis.clicked.connect(self.parse_all_midis)
+            # Editing coords
+            self.pushButton_editCoords.clicked.connect(self.edit_coords)
+            self.pushButton_loadSheet.clicked.connect(self.load_sheet)
+            self.pushButton_loadPerformanceFeatures.clicked.connect(
+                self.load_performance_features)
+            self.pushButton_loadCoords.clicked.connect(self.load_coords)
+            self.pushButton_saveCoords.clicked.connect(self.save_coords)
 
-        # Params for sheet editing: system bbox --> roi
-        self.window_top = self.spinBox_window_top.value()
-        self.window_bottom = self.spinBox_window_bottom.value()
+            self.spinBox_window_top.valueChanged.connect(self.update_staff_windows)
+            self.spinBox_window_bottom.valueChanged.connect(self.update_staff_windows)
+            self.spinBox_page.valueChanged.connect(self.edit_coords)
+
+            # Deprecated in favor of batch processing
+            self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
+            self.pushButton_copySheets.clicked.connect(self.copy_sheets)
+            self.pushButton_prepareAll.clicked.connect(self.prepare_all_audio)
+            self.pushButton_parseAllMidis.clicked.connect(self.parse_all_midis)
+
+            # Params for sheet editing: system bbox --> roi
+            self.window_top = self.spinBox_window_top.value()
+            self.window_bottom = self.spinBox_window_bottom.value()
+
+        self.interactive = interactive
 
         self.target_width = 835
         self.retain_audio = True  # By default, the manager generates everything
@@ -2302,8 +2305,8 @@ def run_batch_mode(args):
         raise OSError('Config file does not exist: {0}'.format(config_file))
 
     # We need to initialize the app to give PyQT all the context it expects
-    app = QtGui.QApplication(sys.argv)
-    mgr = SheetManager()
+    app = QtGui.QApplication(sys.argv, False)
+    mgr = SheetManager(interactive=False)
     # Does not do mgr.show()!
     # app.exec_()
 
