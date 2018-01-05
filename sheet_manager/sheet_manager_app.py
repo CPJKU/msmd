@@ -932,37 +932,37 @@ class SheetManager(QtGui.QMainWindow, form_class):
         warnings.warn('Replaced by batch processing.',
                       DeprecationWarning)
         return
-
-        self.status_label.setText("Rendering audios ...")
-        from render_audio import render_audio
-
-        for i, piece in enumerate(PIECES):
-            txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
-            print(txt)
-
-            # compile directories
-            src_dir = os.path.join(ROOT_DIR, piece)
-            target_dir = os.path.join(TARGET_DIR, piece)
-            if not os.path.exists(target_dir):
-                os.makedirs(target_dir)
-
-            # clean up folder
-            for f in glob.glob(os.path.join(target_dir, "audio/*")):
-                os.remove(f)
-
-            # get midi file name
-            midi_file = glob.glob(os.path.join(src_dir, piece + '.mid*'))
-            if len(midi_file) == 0:
-                continue
-            midi_file = midi_file[0]
-
-            # render audios
-            for ratio in tempo_ratios:
-                for sf in sound_fonts:
-                    render_audio(midi_file, sound_font=sf, tempo_ratio=ratio, velocity=None, target_dir=target_dir)
-
-        self.status_label.setText("done!")
-        print("done!")
+        #
+        # self.status_label.setText("Rendering audios ...")
+        # from render_audio import render_audio
+        #
+        # for i, piece in enumerate(PIECES):
+        #     txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
+        #     print(txt)
+        #
+        #     # compile directories
+        #     src_dir = os.path.join(ROOT_DIR, piece)
+        #     target_dir = os.path.join(TARGET_DIR, piece)
+        #     if not os.path.exists(target_dir):
+        #         os.makedirs(target_dir)
+        #
+        #     # clean up folder
+        #     for f in glob.glob(os.path.join(target_dir, "audio/*")):
+        #         os.remove(f)
+        #
+        #     # get midi file name
+        #     midi_file = glob.glob(os.path.join(src_dir, piece + '.mid*'))
+        #     if len(midi_file) == 0:
+        #         continue
+        #     midi_file = midi_file[0]
+        #
+        #     # render audios
+        #     for ratio in tempo_ratios:
+        #         for sf in sound_fonts:
+        #             render_audio(midi_file, sound_font=sf, tempo_ratio=ratio, velocity=None, target_dir=target_dir)
+        #
+        # self.status_label.setText("done!")
+        # print("done!")
 
     def extract_performance_features(self, retain_audio=False):
         """
@@ -1118,50 +1118,50 @@ class SheetManager(QtGui.QMainWindow, form_class):
         warnings.warn('Replaced by batch processing.',
                       DeprecationWarning)
         return
-
-        self.status_label.setText("Parsing midis ...")
-
-        for i, piece in enumerate(PIECES):
-            txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
-            print(txt)
-
-            # create target folder
-            target_dir = os.path.join(TARGET_DIR, piece)
-            spec_dir = os.path.join(target_dir, "spec")
-            if not os.path.exists(spec_dir):
-                os.makedirs(spec_dir)
-
-            # clean up folder
-            for f in glob.glob(spec_dir + "/*"):
-                os.remove(f)
-
-            pattern = target_dir + "/audio/*.mid*"
-            for midi_file_path in glob.glob(pattern):
-                print("Processing", midi_file_path)
-
-                # get file names and directories
-                directory = os.path.dirname(midi_file_path)
-                file_name = os.path.basename(midi_file_path).split('.')[0]
-                audio_file_path = os.path.join(directory, file_name + '.flac')
-                spec_file_path = os.path.join(spec_dir, file_name + '_spec.npy')
-                onset_file_path = os.path.join(spec_dir, file_name + '_onsets.npy')
-                midi_matrix_file_path = os.path.join(spec_dir, file_name + '_midi.npy')
-
-                # parse midi file
-                midi_parser = MidiParser(show=False)
-                Spec, onsets, midi_matrix = midi_parser.process(midi_file_path, audio_file_path,
-                                                                return_midi_matrix=True)
-
-                # save data
-                np.save(spec_file_path, Spec)
-                np.save(onset_file_path, onsets)
-                np.save(midi_matrix_file_path, midi_matrix)
-
-                # remove audio file to save disk space
-                os.remove(audio_file_path)
-
-        self.status_label.setText("done!")
-        print("done!")
+        #
+        # self.status_label.setText("Parsing midis ...")
+        #
+        # for i, piece in enumerate(PIECES):
+        #     txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
+        #     print(txt)
+        #
+        #     # create target folder
+        #     target_dir = os.path.join(TARGET_DIR, piece)
+        #     spec_dir = os.path.join(target_dir, "spec")
+        #     if not os.path.exists(spec_dir):
+        #         os.makedirs(spec_dir)
+        #
+        #     # clean up folder
+        #     for f in glob.glob(spec_dir + "/*"):
+        #         os.remove(f)
+        #
+        #     pattern = target_dir + "/audio/*.mid*"
+        #     for midi_file_path in glob.glob(pattern):
+        #         print("Processing", midi_file_path)
+        #
+        #         # get file names and directories
+        #         directory = os.path.dirname(midi_file_path)
+        #         file_name = os.path.basename(midi_file_path).split('.')[0]
+        #         audio_file_path = os.path.join(directory, file_name + '.flac')
+        #         spec_file_path = os.path.join(spec_dir, file_name + '_spec.npy')
+        #         onset_file_path = os.path.join(spec_dir, file_name + '_onsets.npy')
+        #         midi_matrix_file_path = os.path.join(spec_dir, file_name + '_midi.npy')
+        #
+        #         # parse midi file
+        #         midi_parser = MidiParser(show=False)
+        #         Spec, onsets, midi_matrix = midi_parser.process(midi_file_path, audio_file_path,
+        #                                                         return_midi_matrix=True)
+        #
+        #         # save data
+        #         np.save(spec_file_path, Spec)
+        #         np.save(onset_file_path, onsets)
+        #         np.save(midi_matrix_file_path, midi_matrix)
+        #
+        #         # remove audio file to save disk space
+        #         os.remove(audio_file_path)
+        #
+        # self.status_label.setText("done!")
+        # print("done!")
 
     def copy_sheets(self):
         """
@@ -1172,23 +1172,23 @@ class SheetManager(QtGui.QMainWindow, form_class):
                       ' score following. Replaced by batch processing.',
                       DeprecationWarning)
         return
-
-        self.status_label.setText("Copying sheets ...")
-
-        for i, piece in enumerate(PIECES):
-            txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
-            print(txt)
-
-            for folder in ["sheet", "coords"]:
-                src_dir = os.path.join(ROOT_DIR, piece, folder)
-                dst_dir = os.path.join(TARGET_DIR, piece, folder)
-
-                if os.path.exists(dst_dir):
-                    shutil.rmtree(dst_dir)
-                shutil.copytree(src_dir, dst_dir)
-
-        self.status_label.setText("done!")
-        print("done!")
+        #
+        # self.status_label.setText("Copying sheets ...")
+        #
+        # for i, piece in enumerate(PIECES):
+        #     txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
+        #     print(txt)
+        #
+        #     for folder in ["sheet", "coords"]:
+        #         src_dir = os.path.join(ROOT_DIR, piece, folder)
+        #         dst_dir = os.path.join(TARGET_DIR, piece, folder)
+        #
+        #         if os.path.exists(dst_dir):
+        #             shutil.rmtree(dst_dir)
+        #         shutil.copytree(src_dir, dst_dir)
+        #
+        # self.status_label.setText("done!")
+        # print("done!")
 
     def prepare_all_audio(self):
         """ Call all preparation steps for all audios """
