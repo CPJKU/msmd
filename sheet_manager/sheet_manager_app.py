@@ -85,11 +85,12 @@ PIECES = MOZART_PIECES + BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_
 
 TARGET_DIR = "/home/matthias/mounts/home@rechenknecht1/Data/sheet_localization/real_music_sf"
 
+# Audio augmentation settings:
+#  - fixed SF and tempo combinations for no-aug. training and evaluation,
 fixed_combinations = [(1.0, "ElectricPiano"), (1.0, "grand-piano-YDP-20160804")]
+#  - random soundfont and tempo selection for training data augmentation
 tempo_ratios = [0.9, 0.95, 1.0, 1.05, 1.1]
 sound_fonts = ["acoustic_piano_imis_1", "ElectricPiano", "YamahaGrandPiano"]
-# tempo_ratios = [1.0]
-# sound_fonts = ["FluidR3_GM"]
 
 
 class SheetManagerError(Exception):
@@ -157,7 +158,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.spinBox_window_bottom.valueChanged.connect(self.update_staff_windows)
         self.spinBox_page.valueChanged.connect(self.edit_coords)
 
-        # Deprecated in favor of batch rocessing
+        # Deprecated in favor of batch processing
         self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
         self.pushButton_copySheets.clicked.connect(self.copy_sheets)
         self.pushButton_prepareAll.clicked.connect(self.prepare_all_audio)
@@ -168,6 +169,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.window_bottom = self.spinBox_window_bottom.value()
 
         self.target_width = 835
+        self.retain_audio = True  # By default, the manager generates everything
 
         if not os.path.exists("tmp"):
             os.mkdir("tmp")
@@ -316,7 +318,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # Audio
         self.render_audio()
-        self.extract_performance_features()
+        self.extract_performance_features(retain_audio=self.retain_audio)
 
         # Alignment
         self.load_performance_features()
@@ -494,7 +496,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
             return
 
         try:
-            current_performance = self.piece.load_performance(perf_name)
+            current_performance = self.piece.load_performance(perf_name,
+                                                              require_audio=False,
+                                                              require_midi=True)
         except SheetManagerDBError as e:
             print('Could not load performance {0}: malformed?'
                   ' Error message: {1}'.format(perf_name, e.message))
@@ -945,7 +949,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.status_label.setText("done!")
         print("done!")
 
-    def extract_performance_features(self):
+    def extract_performance_features(self, retain_audio=False):
         """
         Parse all performance midi files and create the corresponding
         feature files: spectrogram, MIDI matrix, and onsets. Assumes both
@@ -995,7 +999,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.note_events = note_events
 
             # TODO: think about this
-            os.unlink(audio_file_path)
+            if not retain_audio:
+                os.unlink(audio_file_path)
 
         # pattern = self.folder_name + "/audio/*.mid*"
         # for midi_file_path in glob.glob(pattern):
@@ -2157,6 +2162,7 @@ def build_argument_parser():
     parser.add_argument('-i', '--interactive', action='store_true',
                         help='If set, will always launch interactive mode'
                              ' regardless of other arguments.')
+
     parser.add_argument('-d', '--data_dir', default=None,
                         help='[CLI] This is the root data directory. The piece'
                              ' dirs should be directly in this one. If running'
@@ -2170,8 +2176,16 @@ def build_argument_parser():
     parser.add_argument('--first_k', type=int, action='store', default=None,
                         help='[CLI] Only process the frist K pieces in the data dir.'
                              ' Equivalent to -p `ls $DATA_DIR | head -n $K`.')
+
+    parser.add_argument('--retain_audio', action='store_true',
+                        help='If set, will retain the rendered audio files,'
+                             ' not just the spectrograms derived from them.'
+                             ' Note that this makes the dataset *HUGE* when'
+                             ' performance augmentations are done with'
+                             ' multiple soundfonts and tempo settings.')
+
     parser.add_argument('-c', '--config',
-                        help='Load configuration from this file.')
+                        help='Load configuration from this file. [NOT IMPLEMENTED]')
     parser.add_argument('-f', '--force',
                         help='Forces overwrite of existing data.'
                              ' [NOT IMPLEMENTED]')
@@ -2179,6 +2193,7 @@ def build_argument_parser():
                         help='If set, will not stop when the Sheet Manager'
                              ' raises an error. Instead, it will simply skip'
                              ' over the piece that raised the error.')
+
     parser.add_argument('--save_stats', action='store',
                         help='Pickle the alignment statistics of the pieces.')
     parser.add_argument('--stats_only', action='store_true',
@@ -2187,6 +2202,7 @@ def build_argument_parser():
     parser.add_argument('--save_piece_lists', action='store',
                         help='Save lists of pieces to yaml file.'
                              ' (success, failed, problems)')
+
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Turn on INFO messages.')
     parser.add_argument('--debug', action='store_true',
@@ -2247,6 +2263,10 @@ def run_batch_mode(args):
     mgr = SheetManager()
     # Does not do mgr.show()!
     # app.exec_()
+
+    #####################
+    # Set up the mgr. settings
+    mgr.retain_audio = args.retain_audio
 
     ##########################################################################
 

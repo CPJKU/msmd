@@ -154,9 +154,9 @@ class Piece(object):
         """Returns a list of all the available Scores."""
         return [self.load_score(s) for s in self.available_scores]
 
-    def load_performance(self, performance_name, require_audio=True):
+    def load_performance(self, performance_name, **perf_kwargs):
         """Creates a ``Performance`` object for the given performance
-        and returns it."""
+        and returns it. You can pass Performance initialization kwargs."""
         self.update()
         if performance_name not in self.performances:
             raise SheetManagerDBError('Piece {0} in collection {1} does'
@@ -168,7 +168,7 @@ class Piece(object):
         performance_dir = self.performances[performance_name]
         performance = Performance(folder=performance_dir,
                                   piece_name=self.name,
-                                  require_audio=require_audio)
+                                  **perf_kwargs)
         return performance
 
     def load_all_performances(self):

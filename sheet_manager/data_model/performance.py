@@ -30,7 +30,8 @@ class Performance(object):
     # AUDIO_EXTENSIONS = ['flac', 'wav', 'mp3', 'ogg']
     AUDIO_NAMING_SEPARATOR = '_'
 
-    def __init__(self, folder, piece_name, audio_fmt='flac', require_audio=True):
+    def __init__(self, folder, piece_name, audio_fmt='flac',
+                 require_audio=True, require_midi=True):
         """Initialize Performance.
 
         :param audio_fmt: The audio of the performance is expected
@@ -51,13 +52,12 @@ class Performance(object):
             audio_fmt = audio_fmt[1:]
         self.audio_fmt = audio_fmt
 
-        if require_audio:
-            self.audio = self.discover_audio()
+        self.audio = self.discover_audio(required=require_audio)
+        self.audio_name = None
+        if self.audio:
             self.audio_name = path2name(self.audio)
-        else:
-            self.audio = None
-            self.audio_name = None
-        self.midi = self.discover_midi()
+
+        self.midi = self.discover_midi(required=require_midi)
 
         self.features_dir = os.path.join(self.folder, 'features')
         self._ensure_features_dir()
@@ -132,8 +132,9 @@ class Performance(object):
         if not os.path.isdir(self.features_dir):
             os.mkdir(self.features_dir)
 
-    def discover_audio(self):
-        """Looks for audio files in the performance directory.
+    def _discover_candidate_files(self, suffixes, return_all_candidates=False):
+        """Returns a list of the candidate names for MIDI and Audio
+        file discovery (and potentially others).
 
         The discovery looks for a combination of the piece name and
         the performance name in both orders, or in isolation. The
@@ -141,43 +142,108 @@ class Performance(object):
         it to something else in the class attribute
         ``Performance.AUDIO_NAMING_SEPARATOR``).
 
+        :param suffixes: You have to supply
+            the file format(s) -- use ``[mid, midi]`` for MIDI file
+            discovery, as the default fmts might change. (You can also
+            just supply a string if there is only one format you are
+            interested in.)
+
+        :param return_all_candidates: If set, will return two lists:
+            the first is just the discovered candidates, the second
+            list is all the candidate names that were tried.
+
+        :returns: A list of candidate files that exist. If no candidate
+            file exists, returns empty list.
+        """
+        if suffixes is None:
+            raise ValueError('Suffixes for file discovery must be specified.')
+
+        if isinstance(suffixes, str):
+            suffixes = [suffixes]
+
+        discovered_candidates = []
+        all_candidates = []
+
+        for suffix in suffixes:
+            if not suffix.startswith('.'):
+                suffix = '.' + suffix
+            SEP = self.AUDIO_NAMING_SEPARATOR
+            suffix_candidate_names = [
+                SEP.join([self.piece_name, self.name]) + suffix,
+                SEP.join([self.name, self.piece_name]) + suffix,
+                self.piece_name + suffix,
+                self.name + suffix,
+            ]
+            candidate_fnames = [os.path.join(self.folder, a)
+                                      for a in suffix_candidate_names]
+            all_candidates.extend(candidate_fnames)
+
+            for fname in candidate_fnames:
+                if os.path.isfile(fname):
+                    discovered_candidates.append(fname)
+
+        if return_all_candidates:
+            return discovered_candidates, all_candidates
+        return discovered_candidates
+
+    def discover_audio(self, required=False):
+        """Looks for audio files in the performance directory.
+
         If no audio with the format specified for the Performance
         (by default: ``*.flac``) is discovered, will raise
         a ``SheetManagerDBError``.
         """
-        SEP = self.AUDIO_NAMING_SEPARATOR
-        suffix = '.' + self.audio_fmt
-        audio_candidate_names = [
-            SEP.join([self.piece_name, self.name]) + suffix,
-            SEP.join([self.name, self.piece_name]) + suffix,
-            self.piece_name + suffix,
-            self.name + suffix,
-        ]
-        audio_candidate_fnames = [os.path.join(self.folder, a)
-                                  for a in audio_candidate_names]
-        for fname in audio_candidate_fnames:
-            if os.path.isfile(fname):
-                return fname
+        candidate_files = self._discover_candidate_files(self.audio_fmt)
+        #
+        # SEP = self.AUDIO_NAMING_SEPARATOR
+        # suffix = '.' + self.audio_fmt
+        # audio_candidate_names = [
+        #     SEP.join([self.piece_name, self.name]) + suffix,
+        #     SEP.join([self.name, self.piece_name]) + suffix,
+        #     self.piece_name + suffix,
+        #     self.name + suffix,
+        # ]
+        # audio_candidate_fnames = [os.path.join(self.folder, a)
+        #                           for a in audio_candidate_names]
+        # for fname in audio_candidate_fnames:
+        #     if os.path.isfile(fname):
+        #         return fname
 
-        raise SheetManagerDBError('No audio with requested format {0}'
-                                  ' found in performance {1}!'
-                                  ' Candidate audios names: {2}'
-                                  ''.format(suffix, self.folder,
-                                            audio_candidate_names))
+        if len(candidate_files) == 0:
+            if required:
+                raise SheetManagerDBError('No audio with requested format {0}'
+                                          ' found in performance {1}!'
+                                          ''.format(self.audio_fmt, self.folder))
+            else:
+                return None
 
-    def discover_midi(self):
+        return candidate_files[0]
+
+    def discover_midi(self, required=True):
         """Based on the discovered audio, finds the performance
         MIDI (if available)."""
+        midi_fname = None
 
         if self.audio is None:
-            # TODO: discover midi (file discovery helper)
-            return None
+            candidate_files, all_candidates = self._discover_candidate_files(['mid', 'midi'],
+                                                                             return_all_candidates=True)
+            if len(candidate_files) == 0:
+                midi_fname = None
+            else:
+                midi_fname = candidate_files[0]
+        else:
+            midi_fname = os.path.splitext(self.audio)[0] + '.mid'
+            if not os.path.isfile(midi_fname):
+                midi_fname += 'i'
+            if not os.path.isfile(midi_fname):
+                midi_fname = None
 
-        midi_fname = os.path.splitext(self.audio)[0] + '.mid'
-        if not os.path.isfile(midi_fname):
-            midi_fname += 'i'
-        if not os.path.isfile(midi_fname):
-            return None
+        if midi_fname is None:
+            if required:
+                raise SheetManagerDBError('No MIDI found in performance {0}!'
+                                          ' All candidates: {1}'
+                                          ''.format(self.folder, '\n'.join(all_candidates)))
+
         return midi_fname
 
     def load_metadata(self):
