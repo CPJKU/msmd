@@ -1079,6 +1079,30 @@ def build_system_mungos_on_page(system_boundaries, system_mungo_groups,
     return system_mungs
 
 
+AlnStats = collections.namedtuple('AlnStats',
+                                  ['mungos_not_aligned_not_tied',
+                                   'n_mungos_not_aligned_not_tied',
+                                   'mungos_not_aligned_tied',
+                                   'n_mungos_not_aligned_tied',
+                                   'mungos_aligned_wrong_pitch',
+                                   'n_mungos_aligned_wrong_pitch',
+                                   'mungos_aligned_correct_pitch',
+                                   'n_mungos_aligned_correct_pitch',
+                                   'mungos_aligned_no_pitch',
+                                   'n_mungos_aligned_no_pitch',
+                                   'mungos_not_aligned_no_pitch',
+                                   'n_mungos_not_aligned_no_pitch',
+                                   'events_without_corresponding_mungo',
+                                   'n_events_without_corresponding_mungo',
+                                   'events_with_multiple_mungos',
+                                   'n_events_with_multiple_mungos',
+                                   'n_mungos',
+                                   'n_events',
+                                   'n_aln_pairs',
+                                   'n_system_mungos']
+                                  )
+
+
 def alignment_stats(mungos, events, aln):
     """Compute the hits, misses, and tied misses for the given
     MuNG -- Events alignment.
@@ -1154,33 +1178,27 @@ def alignment_stats(mungos, events, aln):
             e = events[e_idx]
             events_with_multiple_mungos.append(e)
 
-    AlnStats = collections.namedtuple('AlnStats',
-                                      ['mungos_not_aligned_not_tied',
-                                       'mungos_not_aligned_tied',
-                                       'mungos_aligned_wrong_pitch',
-                                       'mungos_aligned_correct_pitch',
-                                       'mungos_aligned_no_pitch',
-                                       'mungos_not_aligned_no_pitch',
-                                       'events_without_corresponding_mungo',
-                                       'events_with_multiple_mungos',
-                                       'n_mungos',
-                                       'n_events',
-                                       'n_aln_pairs',
-                                       'system_mungos']
-                                      )
-
     stats = AlnStats(mungos_not_aligned_not_tied=mungos_not_aligned_not_tied,
+                     n_mungos_not_aligned_not_tied=len(mungos_not_aligned_not_tied),
                      mungos_not_aligned_tied=mungos_not_aligned_tied,
+                     n_mungos_not_aligned_tied=len(mungos_not_aligned_tied),
                      mungos_aligned_wrong_pitch=mungos_aligned_wrong_pitch,
+                     n_mungos_aligned_wrong_pitch=len(mungos_aligned_wrong_pitch),
                      mungos_aligned_correct_pitch=mungos_aligned_correct_pitch,
+                     n_mungos_aligned_correct_pitch=len(mungos_aligned_correct_pitch),
                      mungos_aligned_no_pitch=mungos_aligned_no_pitch,
+                     n_mungos_aligned_no_pitch=len(mungos_aligned_no_pitch),
                      mungos_not_aligned_no_pitch=mungos_not_aligned_no_pitch,
+                     n_mungos_not_aligned_no_pitch=len(mungos_not_aligned_no_pitch),
                      events_without_corresponding_mungo=events_without_corresponding_mungo,
+                     n_events_without_corresponding_mungo=len(events_without_corresponding_mungo),
                      events_with_multiple_mungos=events_with_multiple_mungos,
+                     n_events_with_multiple_mungos=len(events_with_multiple_mungos),
                      n_mungos=n_mungos,
                      n_events=n_events,
                      n_aln_pairs=n_aln_pairs,
-                     system_mungos=system_mungos)
+                     n_system_mungos=len(system_mungos)
+                     )
 
     return stats
 

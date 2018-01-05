@@ -355,8 +355,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.piece.metadata['n_pages'] = self.n_pages
         self.piece.metadata['n_performances'] = len(self.piece.performances)
         self.piece.metadata['n_scores'] = len(self.piece.scores)
-        self.piece.metadata['aln_page_stats'] = dict(page_stats)
-        self.piece.metadata['aln_piece_stats'] = dict(piece_stats)
+        self.piece.metadata['aln_piece_stats'] = dict([kv for kv in piece_stats._asdict().items()
+                                                       if isinstance(kv[1], int)])
+        self.piece.metadata['aln_page_stats'] = [dict([kv for kv in s._asdict().items()
+                                                       if isinstance(kv[1], int)])
+                                                 for s in page_stats.values()]
         self.piece.dump_metadata()
 
         return page_stats, piece_stats
@@ -2315,6 +2318,7 @@ def run_batch_mode(args):
             piece_stats[piece] = page_stats, global_stats
 
             success_pieces.append((piece, piece_dir))
+
             mgr.piece.metadata['processed'] = True
             if any(is_aln_problem(stats) for stats in page_stats.values()):
                 mgr.piece.metadata['aligned_well'] = False
