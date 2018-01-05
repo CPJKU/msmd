@@ -1,4 +1,4 @@
-python-midi>=1.2
+python-midi>=0.2.4
 mido>1.2.8
 madmom>=0.15.1
 matplotlib>=2.0.2
