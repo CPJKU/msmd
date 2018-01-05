@@ -5,9 +5,9 @@ matplotlib>=2.0.2
 music21>=3.1.0
 numpy>=1.13.1
 opencv-python>=3.1.0
-pyqt>=4.11.4
+# pyqt>=4.11.4
 scikit-learn>=0.17.1
-yaml>=0.1.6
+pyyaml>=0.1.6
 pdfminer
 python-ly>=0.9.4
 git+git://github.com/hajicj/muscima#egg=muscima
