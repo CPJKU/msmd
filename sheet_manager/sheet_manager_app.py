@@ -329,7 +329,7 @@ class SheetManager(object):
                                     ''.format(workflow))
 
         # Load
-        logging.debug('RUNNING: ly2pdf_and_midi()')
+        print('RUNNING: ly2pdf_and_midi()')
         self.ly2pdf_and_midi()
         print('RUNNING: pdf2img()')
         self.pdf2img()
@@ -553,12 +553,16 @@ class SheetManager(object):
         Tries to retain the previous score/performance."""
         if not self.gui:
             try:
-                self.set_current_score(self.piece.available_scores[0])
-            except KeyError:
+                available_scores = self.piece.available_scores
+                if len(available_scores) > 0:
+                    self.set_current_score(available_scores[0])
+            except Exception:
                 print('Cannot update score: no score is available!')
             try:
-                self.set_current_performance(self.piece.available_performances[0])
-            except KeyError:
+                available_performances = self.piece.available_performances
+                if len(available_performances) > 0:
+                    self.set_current_performance(available_performances[0])
+            except Exception:
                 print('Cannot update performance: no performance is available!')
             return
 
@@ -634,11 +638,14 @@ class SheetManager(object):
 
         # If successful, the PDF file will be there:
         if os.path.isfile(pdf_path):
+            print('...Adding score to piece')
             self.piece.add_score(name=self.piece.default_score_name,
                                  pdf_file=pdf_path,
                                  overwrite=True)
 
+            print('...Setting current score')
             self.set_current_score(self.piece.default_score_name)
+
             if self.gui:
                 self.gui.lineEdit_pdf.setText(self.pdf_file)
 
@@ -650,6 +657,7 @@ class SheetManager(object):
                   ' Something went badly wrong.')
 
         # Check if the MIDI file was actually created.
+        print('Adding MIDI file...')
         output_midi_file = os.path.join(self.folder_name, self.piece_name) + '.mid'
         if not os.path.isfile(output_midi_file):
             output_midi_file += 'i'  # If it is not *.mid, maybe it has *.midi
@@ -662,8 +670,10 @@ class SheetManager(object):
                     self.gui.lineEdit_midi.setText(self.midi_file)
 
         # Update with the MIDI encoding
+        print('Updating piece')
         self.piece.update()
 
+        print('Refreshing score and perf. selection')
         self._refresh_score_and_performance_selection()
 
     def normalize_ly(self, quiet=False):
