@@ -329,11 +329,14 @@ class SheetManager(object):
                                     ''.format(workflow))
 
         # Load
+        logging.debug('RUNNING: ly2pdf_and_midi()')
         self.ly2pdf_and_midi()
+        print('RUNNING: pdf2img()')
         self.pdf2img()
 
         # Exploiting LilyPond point-and-click PDF annotations to get noteheads
         if is_workflow_ly:
+            print('RUNNING: pdf2coords')
             self.pdf2coords()
 
         # Audio
