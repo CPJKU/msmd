@@ -28,13 +28,13 @@ from utils import BColors
 
 col = BColors()
 
-# ROOT_DIR = "/media/matthias/Data/Data/umc_export/"
-ROOT_DIR = "/media/matthias/Data/umc_export/"
+ROOT_DIR = "/media/matthias/Data/Data/umc_export/"
+# ROOT_DIR = "/media/matthias/Data/umc_export/"
 
 # DST_DIR = "/home/matthias/cp/data/sheet_localization/umc/"
-DST_DIR = "/home/matthias/mounts/home@rechenknecht0/Data/sheet_localization/umc/"
+# DST_DIR = "/home/matthias/mounts/home@rechenknecht0/Data/sheet_localization/umc/"
 
-SHOW_PLOTS = False
+SHOW_PLOTS = True
 
 LOG_FILE = "umc_data_prep.log"
 
