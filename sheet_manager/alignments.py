@@ -1203,6 +1203,12 @@ def alignment_stats(mungos, events, aln):
     return stats
 
 
+def format_stats_latex(stats):
+    lines = []
+    lines.append()
+
+
+
 def is_aln_problem(stats):
     """Returns a guess whether the given stats point to a problem
     in the alignment."""

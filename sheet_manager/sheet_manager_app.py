@@ -395,7 +395,10 @@ class SheetManager(object):
                                     ''.format(piece_folder))
         self.load_piece(piece_folder)
         self.load_performance_features()
-        self.load_sheet()
+        self.load_sheet(update_alignment=False)
+        if len(self.score_performance_alignment) == 0:
+            print('WARNING: computing stats of a piece which does not have'
+                  ' anything aligned!')
         page_stats, piece_stats = self.collect_stats()
         return page_stats, piece_stats
 
@@ -468,11 +471,13 @@ class SheetManager(object):
                       authority_format=workflow)
         self.piece = piece
 
-        if self.gui:
-            self._refresh_score_and_performance_selection()  # @@ GUI
+        # Re-done as not GUI; also updates perf. selection
+        self._refresh_score_and_performance_selection()
 
-            self.update_current_performance() # @@ GUI
-            self.update_current_score() # @@ GUI
+        if self.gui:
+            # This is already done in _refresh_score_and_performance_selection()
+            # self.update_current_performance() # @@ GUI
+            # self.update_current_score() # @@ GUI
 
             if self.pdf_file is not None:
                 self.gui.lineEdit_pdf.setText(self.pdf_file)
@@ -1139,7 +1144,6 @@ class SheetManager(object):
             return
         self.note_events = notes
 
-
         # set number of onsets in gui
         if self.gui:
             self.gui.lineEdit_nOnsets.setText(str(len(self.onsets)))
@@ -1180,7 +1184,7 @@ class SheetManager(object):
 
         # Load MuNG objects, if there are any
         if 'mung' in self.current_score.views:
-            self.load_mung()
+            self.load_mung(update_alignment=update_alignment)
 
         # self.status_label.setText("done!")
 
@@ -1211,8 +1215,10 @@ class SheetManager(object):
                      ''.format([len(self._page_centroids2mungo_map[i])
                                 for i in range(len(self.page_mungos))]))
 
-        # if update_alignment:
-        self.update_mung_alignment()
+        if update_alignment:
+            self.update_mung_alignment()
+        else:
+            self.load_mung_alignment()
 
     def load_coords(self):
         """ Load coordinates """
@@ -1303,11 +1309,13 @@ class SheetManager(object):
                                                      bottomLeft]))
 
     def update_mung_alignment(self):
+        """Re-computes the MuNG-notes alignment & saves the new MuNG."""
 
         logging.info('Updating MuNG alignment...')
         if self.page_mungos is None:
             logging.info('...no MuNG loaded!')
             return None
+
         aln = align_score_to_performance(self.current_score,
                                          self.current_performance)
         logging.info('Total aligned pairs: {0}'.format(len(aln)))
@@ -1322,10 +1330,12 @@ class SheetManager(object):
             for m in mungos:
                 if m.objid not in self.score_performance_alignment:
                     continue
-                e = self.note_events[self.score_performance_alignment[m.objid]]
+                e_idx = self.score_performance_alignment[m.objid]
+                e = self.note_events[e_idx]
                 onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
                 m.data['{0}_onset_seconds'.format(_perf_name)] = e[0]
                 m.data['{0}_onset_frame'.format(_perf_name)] = int(onset_frame)
+                m.data['{0}_note_event_idx'.format(_perf_name)] = e_idx
 
             page_stats = alignment_stats(mungos,
                                          self.note_events,
@@ -1337,6 +1347,46 @@ class SheetManager(object):
                             len(page_stats.mungos_not_aligned_not_tied)))
 
         self.save_mung()
+
+    def _load_mung_alignment(self):
+        """Loads the alignment for the current performance and returns
+        it as a dict: ``objid --> event_idx``."""
+        aln = []
+        _perf_name = self.current_performance.name
+        _onset_seconds_key = '{0}_onset_seconds'.format(_perf_name)
+        _onset_frames_key = '{0}_onset_frames'.format(_perf_name)
+        _event_idx_key = '{0}_note_event_idx'.format(_perf_name)
+        _pitch_key = 'midi_pitch_code'
+
+        _events = self.current_performance.load_note_events()
+        _events_dict = {(e[0], e[1]): i for i, e in enumerate(_events)}
+
+        for i, mungos in enumerate(self.page_mungos):
+            for m in mungos:
+                if _event_idx_key not in m.data:
+                    continue
+
+                e_idx = m.data[_event_idx_key]
+                aln.append((m.objid, e_idx))
+
+        score_performance_alignment = {
+            objid: note_idx
+            for objid, note_idx in aln
+        }
+        return score_performance_alignment
+
+    def load_mung_alignment(self):
+        """Sets the current alignment (``self.score_performance_alignment``)
+        using the current MuNG data. Uses the current performance."""
+        aln_dict = self._load_mung_alignment()
+        self.score_performance_alignment = aln_dict
+
+    def has_alignment(self):
+        aln_dict = self._load_mung_alignment()
+        if len(aln_dict) == 0:
+            return False
+        else:
+            return True
 
     def sort_note_coords(self):
         """ Sort note coordinates by systems (ROIs).
@@ -2373,7 +2423,7 @@ def run_batch_mode(args):
     print('Pieces without alignment problems: {0}'
           ''.format(n_successfully_aligned))
     print('Success rate: {0:.2f}'
-          ''.format(float(n_successfully_aligned) / len(args.pieces)))
+          ''.format(float(n_successfully_aligned) / len(pieces)))
 
     print('\nUseful aligned notes: {0}'.format(n_useful_notes))
 
