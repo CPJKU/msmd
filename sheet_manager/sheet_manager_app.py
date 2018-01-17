@@ -386,7 +386,7 @@ class SheetManager(object):
 
         return page_stats, piece_stats
 
-    def get_stats_of_piece(self, piece_folder):
+    def get_stats_of_piece(self, piece_folder, require_alignment=False):
         """Assuming the given piece is finished, compute the stats."""
         self.reset()
 
@@ -399,6 +399,10 @@ class SheetManager(object):
         if len(self.score_performance_alignment) == 0:
             print('WARNING: computing stats of a piece which does not have'
                   ' anything aligned!')
+            if require_alignment:
+                print('Updating alignment...')
+                self.load_sheet(update_alignment=True)
+
         page_stats, piece_stats = self.collect_stats()
         return page_stats, piece_stats
 
@@ -418,6 +422,10 @@ class SheetManager(object):
         # Global statistics
         piece_stats = alignment_stats(all_mungos, all_events,
                                       self.score_performance_alignment)
+
+        # print('Collected piece stats: ', piece_stats)
+        # print('All mungos: {0}, all events: {1}, aln: {2}'
+        #       ''.format(len(all_mungos), len(all_events), len(self.score_performance_alignment)))
 
         return page_stats, piece_stats
 
@@ -2223,8 +2231,12 @@ def build_argument_parser():
                         help='[CLI] Process all the pieces in the data_dir.'
                              ' Equivalent to -p `ls $DATA_DIR`.')
     parser.add_argument('--first_k', type=int, action='store', default=None,
-                        help='[CLI] Only process the frist K pieces in the data dir.'
+                        help='[CLI] Only process the first K pieces in the data dir.'
                              ' Equivalent to -p `ls $DATA_DIR | head -n $K`.')
+    parser.add_argument('--last_k', type=int, action='store', default=None,
+                        help='[CLI] Only process the last K pieces in the data dir.'
+                             ' Useful for 2-core parallelization on a desktop'
+                             ' machine.')
 
     parser.add_argument('--retain_audio', action='store_true',
                         help='If set, will retain the rendered audio files,'
@@ -2297,6 +2309,10 @@ def run_batch_mode(args):
         pieces = [p for p in sorted(os.listdir(data_dir))
                   if os.path.isdir(os.path.join(data_dir, p))]
         pieces = pieces[:args.first_k]
+    elif args.last_k:
+        pieces = [p for p in sorted(os.listdir(data_dir))
+                  if os.path.isdir(os.path.join(data_dir, p))]
+        pieces = pieces[-args.last_k:]
 
     piece_dirs = []
     for p in pieces:
@@ -2336,22 +2352,58 @@ def run_batch_mode(args):
 
         try:
             if args.stats_only:
-                page_stats, global_stats = mgr.get_stats_of_piece(piece_dir)
+                page_stats, global_stats = mgr.get_stats_of_piece(piece_dir,
+                                                                  require_alignment=True)
+                print('Piece stats: ', len(global_stats._asdict().items()))
+
+                # Build metadata from the stats
+                print('Piece metadata: {0}'.format(mgr.piece.metadata))
+                if (mgr.piece.metadata is None) or (len(mgr.piece.metadata) == 0):
+                    print('\tBuilding metadata...')
+                    mgr.piece.metadata['n_pages'] = mgr.n_pages
+                    mgr.piece.metadata['n_performances'] = len(mgr.piece.performances)
+                    mgr.piece.metadata['n_scores'] = len(mgr.piece.scores)
+                    mgr.piece.metadata['aln_piece_stats'] = dict([kv for kv in global_stats._asdict().items()
+                                                                   if isinstance(kv[1], int)])
+                    mgr.piece.metadata['aln_page_stats'] = [dict([kv for kv in s._asdict().items()
+                                                                   if isinstance(kv[1], int)])
+                                                             for s in page_stats.values()]
+
+                    # Coming up with the processing & alignment flags if the piece didn't have any.
+                    if any(is_aln_problem(stats) for stats in page_stats.values()):
+                        mgr.piece.metadata['aligned_well'] = False
+                    elif is_aln_problem(global_stats):
+                        mgr.piece.metadata['aligned_well'] = False
+                    else:
+                        mgr.piece.metadata['aligned_well'] = True
+                        mgr.piece.metadata['processed'] = True
+
+                    mgr.piece.dump_metadata()
+
+                _metadata = mgr.piece.metadata
+
+                if _metadata['processed']:
+                    success_pieces.append((piece, piece_dir))
+                else:
+                    failed_pieces.append((piece, piece_dir))
+
             else:
                 page_stats, global_stats = mgr.process_piece(piece_dir, workflow="ly")
 
+                success_pieces.append((piece, piece_dir))
+
+                # Only generate the processing success flags if the piece
+                # actually has been processed.
+                if mgr.piece.metadata['processed']:
+                    if any(is_aln_problem(stats) for stats in page_stats.values()):
+                        mgr.piece.metadata['aligned_well'] = False
+                    elif is_aln_problem(global_stats):
+                        mgr.piece.metadata['aligned_well'] = False
+                    else:
+                        mgr.piece.metadata['aligned_well'] = True
+                    mgr.piece.dump_metadata()
+
             piece_stats[piece] = page_stats, global_stats
-
-            success_pieces.append((piece, piece_dir))
-
-            mgr.piece.metadata['processed'] = True
-            if any(is_aln_problem(stats) for stats in page_stats.values()):
-                mgr.piece.metadata['aligned_well'] = False
-            elif is_aln_problem(global_stats):
-                mgr.piece.metadata['aligned_well'] = False
-            else:
-                mgr.piece.metadata['aligned_well'] = True
-            mgr.piece.dump_metadata()
 
         except Exception as mgre:
             print('Error: {0}'.format(mgre))

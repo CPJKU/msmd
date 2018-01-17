@@ -1200,6 +1200,7 @@ def alignment_stats(mungos, events, aln):
                      n_system_mungos=len(system_mungos)
                      )
 
+    # print('Returning stats with {0} mungos, {1} pairs'.format(stats.n_mungos, stats.n_aln_pairs))
     return stats
 
 

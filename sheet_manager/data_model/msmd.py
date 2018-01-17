@@ -9,7 +9,7 @@ import yaml
 
 from sheet_manager.data_model.piece import Piece
 from sheet_manager.data_model.util import SheetManagerDBError
-from sheet_manager.utils import aggregate_dicts, average_dicts, reduce_dicts
+from sheet_manager.utils import aggregate_dicts, reduce_dicts
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
