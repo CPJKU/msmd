@@ -52,7 +52,6 @@ test:
 train:
 - BachJS__BWV1006a__bwv-1006a_6
 - BachJS__BWV825__15title-hub
-- BachJS__BWV1079__ricercare6
 - BachJS__BWV860__BWV860_Praeludium15
 - BachJS__BWV775__bach-invention-04
 - BachJS__BWV846__wtk1-fugue1
@@ -78,7 +77,6 @@ train:
 - BachJS__BWVAnh116__anna-magdalena-07
 - BachJS__BWV870__wtk2fuga1
 - BachJS__BWV869__bwv869b
-- BachJS__BWV1080__contrapunctusI
 - BachJS__BWV861__BWV861_Praeludium16
 - BachJS__BWV829__54title-hub
 - BachJS__BWV856__BWV856_Fugue11
