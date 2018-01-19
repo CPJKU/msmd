@@ -6,8 +6,8 @@ import yaml
 from tqdm import tqdm
 
 from audio_sheet_retrieval.config.settings import DATA_ROOT_MSMD
-from data_pools import prepare_piece_data, AudioScoreRetrievalPool, AUGMENT, NO_AUGMENT
-from data_pools import SPEC_CONTEXT, SHEET_CONTEXT, SYSTEM_HEIGHT
+from sheet_manager.data_pools.data_pools import prepare_piece_data, AudioScoreRetrievalPool, AUGMENT, NO_AUGMENT
+from sheet_manager.data_pools.data_pools import SPEC_CONTEXT, SHEET_CONTEXT, SYSTEM_HEIGHT
 
 from data_pools import ScoreInformedTranscriptionPool
 
@@ -250,7 +250,7 @@ if __name__ == "__main__":
 
     def train_batch_iterator(batch_size=1):
         """ Compile batch iterator """
-        from audio_sheet_retrieval.utils.batch_iterators import TripleviewPoolIteratorUnsupervised
+        from sheet_manager.data_pools.batch_iterators import TripleviewPoolIteratorUnsupervised
         batch_iterator = TripleviewPoolIteratorUnsupervised(batch_size=batch_size, prepare=prepare, k_samples=None)
         return batch_iterator
 
