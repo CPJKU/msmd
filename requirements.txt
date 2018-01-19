@@ -14,3 +14,4 @@ git+git://github.com/hajicj/muscima#egg=muscima
 abjad>=2.21
 scikit-image>=0.13
 tqdm>=4.19.5
+dtw>=1.3
