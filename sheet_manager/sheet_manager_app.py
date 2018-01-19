@@ -96,7 +96,75 @@ class SheetManagerError(Exception):
     pass
 
 
-class SheetManager(QtGui.QMainWindow, form_class):
+class SheetManagerGui(QtGui.QMainWindow, form_class):
+
+    def __init__(self, parent):
+        QtGui.QMainWindow.__init__(self, parent)
+        self.setupUi(self)
+
+    def setup_bindings(self, mgr):
+        """Sets up bindings between GUI elements and corresponding
+        Sheet Manager actions."""
+
+        # set up status bar
+        self.status_label = QtGui.QLabel("")
+        self.statusbar.addWidget(self.status_label)
+
+        # connect to menu
+        self.actionOpen_sheet.triggered.connect(mgr.open_sheet)
+        self.pushButton_open.clicked.connect(mgr.open_sheet)
+
+        self.comboBox_score.activated.connect(mgr.update_current_score)
+        self.comboBox_performance.activated.connect(mgr.update_current_performance)
+
+        # connect to omr menu
+        self.actionInit.triggered.connect(mgr.init_omr)
+        self.actionDetect_note_heads.triggered.connect(mgr.detect_note_heads)
+        self.actionDetect_systems.triggered.connect(mgr.detect_systems)
+        self.actionDetect_bars.triggered.connect(mgr.detect_bars)
+
+        # connect to check boxes
+        self.checkBox_showCoords.stateChanged.connect(mgr.plot_sheet)
+        self.checkBox_showRois.stateChanged.connect(mgr.plot_sheet)
+        self.checkBox_showSystems.stateChanged.connect(mgr.plot_sheet)
+        self.checkBox_showBars.stateChanged.connect(mgr.plot_sheet)
+
+        # Workflow for generating
+        self.pushButton_mxml2midi.clicked.connect(mgr.mxml2midi)
+        self.pushButton_ly2PdfMidi.clicked.connect(mgr.ly2pdf_and_midi)
+        self.pushButton_pdf2Img.clicked.connect(mgr.pdf2img)
+        self.pushButton_pdf2Coords.clicked.connect(mgr.pdf2coords)
+        self.pushButton_renderAudio.clicked.connect(mgr.render_audio)
+        self.pushButton_extractPerformanceFeatures.clicked.connect(
+            mgr.extract_performance_features)
+        self.pushButton_audio2sheet.clicked.connect(mgr.match_audio2sheet)
+
+        self.pushButton_ClearState.clicked.connect(mgr.reset)
+
+        # Editing coords
+        self.pushButton_editCoords.clicked.connect(mgr.edit_coords)
+        self.pushButton_loadSheet.clicked.connect(mgr.load_sheet)
+        self.pushButton_loadPerformanceFeatures.clicked.connect(
+            mgr.load_performance_features)
+        self.pushButton_loadCoords.clicked.connect(mgr.load_coords)
+        self.pushButton_saveCoords.clicked.connect(mgr.save_coords)
+
+        self.spinBox_window_top.valueChanged.connect(mgr.update_staff_windows)
+        self.spinBox_window_bottom.valueChanged.connect(mgr.update_staff_windows)
+        self.spinBox_page.valueChanged.connect(mgr.edit_coords)
+
+        # Deprecated in favor of batch processing
+        # self.pushButton_renderAllAudios.clicked.connect(mgr.render_all_audios)
+        # self.pushButton_copySheets.clicked.connect(mgr.copy_sheets)
+        # self.pushButton_prepareAll.clicked.connect(mgr.prepare_all_audio)
+        # self.pushButton_parseAllMidis.clicked.connect(mgr.parse_all_midis)
+
+        # Params for sheet editing: system bbox --> roi
+        mgr.window_top = self.spinBox_window_top.value()
+        mgr.window_bottom = self.spinBox_window_bottom.value()
+
+
+class SheetManager(object):
     """Processing and GUI for the Multi-Modal MIR dataset.
 
     The workflow is wrapped in the ``process_piece()`` method.
@@ -106,69 +174,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """
         Constructor
         """
-
-        if interactive:
-            QtGui.QMainWindow.__init__(self, parent)
-            self.setupUi(self)
-
-            # set up status bar
-            self.status_label = QtGui.QLabel("")
-            self.statusbar.addWidget(self.status_label)
-
-            # connect to menu
-            self.actionOpen_sheet.triggered.connect(self.open_sheet)
-            self.pushButton_open.clicked.connect(self.open_sheet)
-
-            self.comboBox_score.activated.connect(self.update_current_score)
-            self.comboBox_performance.activated.connect(self.update_current_performance)
-
-            # connect to omr menu
-            self.actionInit.triggered.connect(self.init_omr)
-            self.actionDetect_note_heads.triggered.connect(self.detect_note_heads)
-            self.actionDetect_systems.triggered.connect(self.detect_systems)
-            self.actionDetect_bars.triggered.connect(self.detect_bars)
-
-            # connect to check boxes
-            self.checkBox_showCoords.stateChanged.connect(self.plot_sheet)
-            self.checkBox_showRois.stateChanged.connect(self.plot_sheet)
-            self.checkBox_showSystems.stateChanged.connect(self.plot_sheet)
-            self.checkBox_showBars.stateChanged.connect(self.plot_sheet)
-
-            # Workflow for generating
-            self.pushButton_mxml2midi.clicked.connect(self.mxml2midi)
-            self.pushButton_ly2PdfMidi.clicked.connect(self.ly2pdf_and_midi)
-            self.pushButton_pdf2Img.clicked.connect(self.pdf2img)
-            self.pushButton_pdf2Coords.clicked.connect(self.pdf2coords)
-            self.pushButton_renderAudio.clicked.connect(self.render_audio)
-            self.pushButton_extractPerformanceFeatures.clicked.connect(
-                self.extract_performance_features)
-            self.pushButton_audio2sheet.clicked.connect(self.match_audio2sheet)
-
-            self.pushButton_ClearState.clicked.connect(self.reset)
-
-            # Editing coords
-            self.pushButton_editCoords.clicked.connect(self.edit_coords)
-            self.pushButton_loadSheet.clicked.connect(self.load_sheet)
-            self.pushButton_loadPerformanceFeatures.clicked.connect(
-                self.load_performance_features)
-            self.pushButton_loadCoords.clicked.connect(self.load_coords)
-            self.pushButton_saveCoords.clicked.connect(self.save_coords)
-
-            self.spinBox_window_top.valueChanged.connect(self.update_staff_windows)
-            self.spinBox_window_bottom.valueChanged.connect(self.update_staff_windows)
-            self.spinBox_page.valueChanged.connect(self.edit_coords)
-
-            # Deprecated in favor of batch processing
-            self.pushButton_renderAllAudios.clicked.connect(self.render_all_audios)
-            self.pushButton_copySheets.clicked.connect(self.copy_sheets)
-            self.pushButton_prepareAll.clicked.connect(self.prepare_all_audio)
-            self.pushButton_parseAllMidis.clicked.connect(self.parse_all_midis)
-
-            # Params for sheet editing: system bbox --> roi
-            self.window_top = self.spinBox_window_top.value()
-            self.window_bottom = self.spinBox_window_bottom.value()
-
-        self.interactive = interactive
+        self.window_bottom = 5
+        self.window_top = 5
 
         self.target_width = 835
         self.retain_audio = True  # By default, the manager generates everything
@@ -232,6 +239,16 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.score_performance_alignment = None
         # Dict: objid --> event_idx
 
+        self.interactive = interactive
+
+        if self.interactive:
+            print('SheetManager: running in INTERACTIVE mode')
+            self.gui = SheetManagerGui(parent=parent)
+            self.gui.setup_bindings(self)
+        else:
+            self.gui = None
+            print('SheetManager: running in BATCH mode')
+
     def reset(self):
         """Resets the SheetManager back to its initial state."""
         self.piece = None
@@ -276,7 +293,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # piece root folder
         folder_name = str(QtGui.QFileDialog.getExistingDirectory(
-            self,
+            self.gui,
             "Select Sheet Music",
             "."))
         self.load_piece(folder_name=folder_name)
@@ -312,11 +329,14 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                     ''.format(workflow))
 
         # Load
+        print('RUNNING: ly2pdf_and_midi()')
         self.ly2pdf_and_midi()
+        print('RUNNING: pdf2img()')
         self.pdf2img()
 
         # Exploiting LilyPond point-and-click PDF annotations to get noteheads
         if is_workflow_ly:
+            print('RUNNING: pdf2coords')
             self.pdf2coords()
 
         # Audio
@@ -366,7 +386,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         return page_stats, piece_stats
 
-    def get_stats_of_piece(self, piece_folder):
+    def get_stats_of_piece(self, piece_folder, require_alignment=False):
         """Assuming the given piece is finished, compute the stats."""
         self.reset()
 
@@ -375,7 +395,14 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                     ''.format(piece_folder))
         self.load_piece(piece_folder)
         self.load_performance_features()
-        self.load_sheet()
+        self.load_sheet(update_alignment=False)
+        if len(self.score_performance_alignment) == 0:
+            print('WARNING: computing stats of a piece which does not have'
+                  ' anything aligned!')
+            if require_alignment:
+                print('Updating alignment...')
+                self.load_sheet(update_alignment=True)
+
         page_stats, piece_stats = self.collect_stats()
         return page_stats, piece_stats
 
@@ -395,6 +422,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # Global statistics
         piece_stats = alignment_stats(all_mungos, all_events,
                                       self.score_performance_alignment)
+
+        # print('Collected piece stats: ', piece_stats)
+        # print('All mungos: {0}, all events: {1}, aln: {2}'
+        #       ''.format(len(all_mungos), len(all_events), len(self.score_performance_alignment)))
 
         return page_stats, piece_stats
 
@@ -426,6 +457,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                            if first_onset <= e[0] <= last_onset}
         return page_event_dict
 
+    # r-x GUI
     def load_piece(self, folder_name):
         """Given a piece folder, set the current state of SheetManager to this piece.
         If the folder does not exist, does nothing."""
@@ -447,15 +479,18 @@ class SheetManager(QtGui.QMainWindow, form_class):
                       authority_format=workflow)
         self.piece = piece
 
+        # Re-done as not GUI; also updates perf. selection
         self._refresh_score_and_performance_selection()
 
-        self.update_current_performance()
-        self.update_current_score()
+        if self.gui:
+            # This is already done in _refresh_score_and_performance_selection()
+            # self.update_current_performance() # @@ GUI
+            # self.update_current_score() # @@ GUI
 
-        if self.pdf_file is not None:
-            self.lineEdit_pdf.setText(self.pdf_file)
-        else:
-            self.lineEdit_pdf.setText("")
+            if self.pdf_file is not None:
+                self.gui.lineEdit_pdf.setText(self.pdf_file)
+            else:
+                self.gui.lineEdit_pdf.setText("")
 
         # Old workflow.
         self.piece_name = piece_name
@@ -469,14 +504,16 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.lily_normalized_file = self.piece.encodings.get('norm.ly', "")
 
         # update gui elements
-        self.lineEdit_mxml.setText(self.mxml_file)
-        self.lineEdit_lily.setText(self.lily_file)
-        self.lineEdit_midi.setText(self.midi_file)
+        if self.gui:
+            self.gui.lineEdit_mxml.setText(self.mxml_file)
+            self.gui.lineEdit_lily.setText(self.lily_file)
+            self.gui.lineEdit_midi.setText(self.midi_file)
 
+    # r-- GUI
     def update_current_score(self):
         """Reacts to a change in the score that SheetManager is supposed
         to be currently processing."""
-        score_name = str(self.comboBox_score.currentText())
+        score_name = str(self.gui.comboBox_score.currentText())
         self.set_current_score(score_name)
 
     def set_current_score(self, score_name):
@@ -500,8 +537,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.sheet_folder = self.current_score.img_dir
         self.coord_folder = self.current_score.coords_dir
 
+    # r-- GUI
     def update_current_performance(self):
-        perf_name = str(self.comboBox_performance.currentText())
+        perf_name = str(self.gui.comboBox_performance.currentText())
         self.set_current_performance(perf_name)
 
     def set_current_performance(self, perf_name):
@@ -522,43 +560,64 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.current_performance = current_performance
         self.performance_name = perf_name
 
+    # rwx GUI
     def _refresh_score_and_performance_selection(self):
         """Synchronizes the selection of scores and performances.
         Tries to retain the previous score/performance."""
-        old_score_idx = self.comboBox_score.currentIndex()
-        old_score = str(self.comboBox_score.itemText(old_score_idx))
+        if not self.gui:
+            try:
+                available_scores = self.piece.available_scores
+                if len(available_scores) > 0:
+                    self.set_current_score(available_scores[0])
+            except Exception:
+                print('Cannot update score: no score is available!')
+            try:
+                available_performances = self.piece.available_performances
+                if len(available_performances) > 0:
+                    self.set_current_performance(available_performances[0])
+            except Exception:
+                print('Cannot update performance: no performance is available!')
+            return
 
-        old_perf_idx = self.comboBox_performance.currentIndex()
-        old_perf = str(self.comboBox_performance.itemText(old_perf_idx))
+        # With GUI:
+
+        old_score_idx = self.gui.comboBox_score.currentIndex()
+        old_score = str(self.gui.comboBox_score.itemText(old_score_idx))
+
+        old_perf_idx = self.gui.comboBox_performance.currentIndex()
+        old_perf = str(self.gui.comboBox_performance.itemText(old_perf_idx))
 
         self.piece.update()
 
-        self.comboBox_score.clear()
-        self.comboBox_score.addItems(self.piece.available_scores)
+        self.gui.comboBox_score.clear()
+        self.gui.comboBox_score.addItems(self.piece.available_scores)
         if old_score in self.piece.available_scores:
             idx = self.piece.available_scores.index(old_score)
-            self.comboBox_score.setCurrentIndex(idx)
+            self.gui.comboBox_score.setCurrentIndex(idx)
         else:
-            self.comboBox_score.setCurrentIndex(0)
+            self.gui.comboBox_score.setCurrentIndex(0)
             self.update_current_score()
 
-        self.comboBox_performance.clear()
-        self.comboBox_performance.addItems(self.piece.available_performances)
+        self.gui.comboBox_performance.clear()
+        self.gui.comboBox_performance.addItems(self.piece.available_performances)
         if old_perf in self.piece.available_performances:
             idx = self.piece.available_performances.index(old_perf)
-            self.comboBox_performance.setCurrentIndex(idx)
+            self.gui.comboBox_performance.setCurrentIndex(idx)
         else:
-            self.comboBox_performance.setCurrentIndex(0)
+            self.gui.comboBox_performance.setCurrentIndex(0)
             self.update_current_performance()
 
+    # -wx GUI
     def ly2pdf_and_midi(self, quiet=False):
         """Convert the LilyPond file to PDF and MIDI (which is done automatically, if the Ly
         file contains the \midi { } directive)."""
         self.normalize_ly()
 
-        self.status_label.setText("Convert Ly to pdf ...")
+        if self.gui:
+            self.gui.status_label.setText("Convert Ly to pdf ...")
+
         if not os.path.isfile(self.lily_normalized_file):
-            self.status_label.setText("done! (Error: LilyPond file not found!)")
+            self.gui.status_label.setText("done! (Error: LilyPond file not found!)")
             print('Error: LilyPond file not found!')
             return
 
@@ -592,12 +651,16 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # If successful, the PDF file will be there:
         if os.path.isfile(pdf_path):
+            print('...Adding score to piece')
             self.piece.add_score(name=self.piece.default_score_name,
                                  pdf_file=pdf_path,
                                  overwrite=True)
 
+            print('...Setting current score')
             self.set_current_score(self.piece.default_score_name)
-            self.lineEdit_pdf.setText(self.pdf_file)
+
+            if self.gui:
+                self.gui.lineEdit_pdf.setText(self.pdf_file)
 
             # Cleanup!
             os.unlink(pdf_path)
@@ -607,6 +670,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                   ' Something went badly wrong.')
 
         # Check if the MIDI file was actually created.
+        print('Adding MIDI file...')
         output_midi_file = os.path.join(self.folder_name, self.piece_name) + '.mid'
         if not os.path.isfile(output_midi_file):
             output_midi_file += 'i'  # If it is not *.mid, maybe it has *.midi
@@ -615,10 +679,14 @@ class SheetManager(QtGui.QMainWindow, form_class):
                       ' file for \\midi { } directive.')
             else:
                 self.midi_file = output_midi_file
-                self.lineEdit_midi.setText(self.midi_file)
+                if self.gui:
+                    self.gui.lineEdit_midi.setText(self.midi_file)
 
         # Update with the MIDI encoding
+        print('Updating piece')
         self.piece.update()
+
+        print('Refreshing score and perf. selection')
         self._refresh_score_and_performance_selection()
 
     def normalize_ly(self, quiet=False):
@@ -689,13 +757,15 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # Update the encodings dict to include the *.norm.ly file
         self.piece.update()
 
+    # r-x GUI
     def pdf2img(self, quiet=False):
         """ Convert pdf file to image """
         _quiet = ""
         if quiet:
             _quiet = " &> /dev/null"
 
-        self.status_label.setText("Convert pdf to images ...")
+        # self.gui.status_label.setText("Convert pdf to images ...")
+
         os.system("rm tmp/*.png" + _quiet)
         pdf_path = self.current_score.pdf_file
         # pdf_path = os.path.join(self.folder_name,
@@ -705,7 +775,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
               "".format(pdf_path) + _quiet
         os.system(cmd)
 
-        self.status_label.setText("Resizing images ...")
+        if self.gui:
+            self.gui.status_label.setText("Resizing images ...")
         img_dir = self.current_score.img_dir
         self.current_score.clear_images()
 
@@ -728,25 +799,29 @@ class SheetManager(QtGui.QMainWindow, form_class):
             out_path = os.path.join(img_dir, "%02d.png" % (i + 1))
             cv2.imwrite(out_path, img_rsz)
 
-            if self.checkBox_showSheet.isChecked():
-                plt.figure()
-                plt.title('{0}, page {1}'.format(self.piece_name, i+1))
-                plt.imshow(img_rsz, cmap=plt.cm.gray)
+            if self.gui:
+                if self.gui.checkBox_showSheet.isChecked():
+                    plt.figure()
+                    plt.title('{0}, page {1}'.format(self.piece_name, i+1))
+                    plt.imshow(img_rsz, cmap=plt.cm.gray)
 
-        if self.checkBox_showSheet.isChecked():
-            plt.show()
+        if self.gui:
+            if self.gui.checkBox_showSheet.isChecked():
+                plt.show()
 
-        self.status_label.setText("done!")
+        # self.gui.status_label.setText("done!")
 
+    # rwx GUI
     def pdf2coords(self):
         """Extracts notehead centroid coords and MuNG features
         from the PDF of the current Score. Saves them to the ``coords/``
         and ``mung/`` view."""
         logging.info("Extracting coords from pdf ...")
-        self.status_label.setText("Extracting coords from pdf ...")
+
+        # self.status_label.setText("Extracting coords from pdf ...")
 
         if not os.path.exists(self.pdf_file):
-            self.status_label.setText("Extracting coords from pdf failed: PDF file not found!")
+            # self.status_label.setText("Extracting coords from pdf failed: PDF file not found!")
             logging.warning("Extracting coords from pdf failed: PDF file not found: {0}"
                             "".format(self.pdf_file))
             return
@@ -755,7 +830,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         n_pages = len(self.page_coords)
         if n_pages == 0:
-            self.status_label.setText("Extracting coords from pdf failed: could not find sheet!")
+            # self.status_label.setText("Extracting coords from pdf failed: could not find sheet!")
 
             logging.warning("Extracting coords from pdf failed: could not find sheet!"
                             " Generate the image files first.")
@@ -855,15 +930,17 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                           prefix=None,
                                           overwrite=True)
 
-        if self.checkBox_showExtractedCoords.isChecked():
-            # Maybe we already have the ROIs for this image.
-            self.load_coords()
-            self.sort_note_coords()
-            self.update_sheet_statistics()
-            self.edit_coords()
+        if self.gui:
+            if self.gui.checkBox_showExtractedCoords.isChecked():
+                # Maybe we already have the ROIs for this image.
+                self.load_coords()
+                self.sort_note_coords()
+                self.update_sheet_statistics()
+                self.edit_coords()
 
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
+    # -w- GUI
     def mxml2midi(self):
         """
         Convert mxml to midi file. Uses LilyPond as an intermediary.
@@ -876,13 +953,14 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # copy midi file
         self.midi_file = os.path.join(self.folder_name, self.piece_name + '.midi')
         os.system("cp tmp/tmp.midi %s" % self.midi_file)
-        self.lineEdit_midi.setText(self.midi_file)
+        if self.gui:
+            self.gui.lineEdit_midi.setText(self.midi_file)
 
     def render_audio(self, performance_prefix="", clear_previous_performances=False):
         """
         Render audio from midi.
         """
-        self.status_label.setText("Rendering audio ...")
+        # self.status_label.setText("Rendering audio ...")
 
         if 'midi' not in self.piece.encodings:
             raise SheetManagerError('Cannot render audio from current piece:'
@@ -926,47 +1004,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
             os.unlink(audio_file)
             os.unlink(perf_midi_file)
 
-        self.status_label.setText("done!")
-
-    def render_all_audios(self):
-        """
-        Render audio from midi for all pieces.
-        """
-        warnings.warn('Replaced by batch processing.',
-                      DeprecationWarning)
-        return
-        #
-        # self.status_label.setText("Rendering audios ...")
-        # from render_audio import render_audio
-        #
-        # for i, piece in enumerate(PIECES):
-        #     txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
-        #     print(txt)
-        #
-        #     # compile directories
-        #     src_dir = os.path.join(ROOT_DIR, piece)
-        #     target_dir = os.path.join(TARGET_DIR, piece)
-        #     if not os.path.exists(target_dir):
-        #         os.makedirs(target_dir)
-        #
-        #     # clean up folder
-        #     for f in glob.glob(os.path.join(target_dir, "audio/*")):
-        #         os.remove(f)
-        #
-        #     # get midi file name
-        #     midi_file = glob.glob(os.path.join(src_dir, piece + '.mid*'))
-        #     if len(midi_file) == 0:
-        #         continue
-        #     midi_file = midi_file[0]
-        #
-        #     # render audios
-        #     for ratio in tempo_ratios:
-        #         for sf in sound_fonts:
-        #             render_audio(midi_file, sound_font=sf, tempo_ratio=ratio, velocity=None, target_dir=target_dir)
-        #
         # self.status_label.setText("done!")
-        # print("done!")
 
+    # r-- GUI
     def extract_performance_features(self, retain_audio=False):
         """
         Parse all performance midi files and create the corresponding
@@ -980,7 +1020,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         """
         from midi_parser import MidiParser
 
-        self.status_label.setText("Parsing performance midi files and audios...")
+        # self.status_label.setText("Parsing performance midi files and audios...")
 
         # For each performance:
         #  - load performance MIDI
@@ -1009,7 +1049,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                              ''.format(performance.name))
                 continue
 
-            midi_parser = MidiParser(show=self.checkBox_showSpec.isChecked())
+            midi_parser = MidiParser(show=(self.gui and self.gui.checkBox_showSpec.isChecked()))
             spectrogram, onsets, midi_matrix, note_events = midi_parser.process(
                 midi_file_path,
                 audio_file_path,
@@ -1061,10 +1101,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
         #
 
         # set number of onsets in gui
-        self.lineEdit_nOnsets.setText(str(len(self.onsets)))
+        if self.gui:
+            self.gui.lineEdit_nOnsets.setText(str(len(self.onsets)))
         
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
+    # -w- GUI
     def load_performance_features(self):
         """
         Load spectrogram, MIDI matrix and onsets from the current performance.
@@ -1110,105 +1152,16 @@ class SheetManager(QtGui.QMainWindow, form_class):
             return
         self.note_events = notes
 
-
         # set number of onsets in gui
-        self.lineEdit_nOnsets.setText(str(len(self.onsets)))
+        if self.gui:
+            self.gui.lineEdit_nOnsets.setText(str(len(self.onsets)))
 
-    def parse_all_midis(self):
-        """
-        Parse midi file for all pieces.
-        """
-        warnings.warn('Replaced by batch processing.',
-                      DeprecationWarning)
-        return
-        #
-        # self.status_label.setText("Parsing midis ...")
-        #
-        # for i, piece in enumerate(PIECES):
-        #     txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
-        #     print(txt)
-        #
-        #     # create target folder
-        #     target_dir = os.path.join(TARGET_DIR, piece)
-        #     spec_dir = os.path.join(target_dir, "spec")
-        #     if not os.path.exists(spec_dir):
-        #         os.makedirs(spec_dir)
-        #
-        #     # clean up folder
-        #     for f in glob.glob(spec_dir + "/*"):
-        #         os.remove(f)
-        #
-        #     pattern = target_dir + "/audio/*.mid*"
-        #     for midi_file_path in glob.glob(pattern):
-        #         print("Processing", midi_file_path)
-        #
-        #         # get file names and directories
-        #         directory = os.path.dirname(midi_file_path)
-        #         file_name = os.path.basename(midi_file_path).split('.')[0]
-        #         audio_file_path = os.path.join(directory, file_name + '.flac')
-        #         spec_file_path = os.path.join(spec_dir, file_name + '_spec.npy')
-        #         onset_file_path = os.path.join(spec_dir, file_name + '_onsets.npy')
-        #         midi_matrix_file_path = os.path.join(spec_dir, file_name + '_midi.npy')
-        #
-        #         # parse midi file
-        #         midi_parser = MidiParser(show=False)
-        #         Spec, onsets, midi_matrix = midi_parser.process(midi_file_path, audio_file_path,
-        #                                                         return_midi_matrix=True)
-        #
-        #         # save data
-        #         np.save(spec_file_path, Spec)
-        #         np.save(onset_file_path, onsets)
-        #         np.save(midi_matrix_file_path, midi_matrix)
-        #
-        #         # remove audio file to save disk space
-        #         os.remove(audio_file_path)
-        #
-        # self.status_label.setText("done!")
-        # print("done!")
-
-    def copy_sheets(self):
-        """
-        Copy sheets to target folder.
-        """
-        warnings.warn('Copying sheets was an application-dependent operation'
-                      ' for extracting aligned png/audio patches for multimodal'
-                      ' score following. Replaced by batch processing.',
-                      DeprecationWarning)
-        return
-        #
-        # self.status_label.setText("Copying sheets ...")
-        #
-        # for i, piece in enumerate(PIECES):
-        #     txt = "\033[94m" + ("\n%03d / %03d %s" % (i + 1, len(PIECES), piece)) + "\033[0m"
-        #     print(txt)
-        #
-        #     for folder in ["sheet", "coords"]:
-        #         src_dir = os.path.join(ROOT_DIR, piece, folder)
-        #         dst_dir = os.path.join(TARGET_DIR, piece, folder)
-        #
-        #         if os.path.exists(dst_dir):
-        #             shutil.rmtree(dst_dir)
-        #         shutil.copytree(src_dir, dst_dir)
-        #
-        # self.status_label.setText("done!")
-        # print("done!")
-
-    def prepare_all_audio(self):
-        """ Call all preparation steps for all audios """
-        warnings.warn('prepare_all_audio() was an application-dependent op'
-                      ' for extracting aligned png/audio patches for multimodal'
-                      ' score following. Replaced by batch processing.',
-                      DeprecationWarning)
-        return
-        # self.render_all_audios()
-        # self.parse_all_midis()
-        # self.copy_sheets()
-
+    # -w- GUI
     def load_sheet(self, update_alignment=True):
         """Load sheet images of current piece to prepare for OMR
         and/or coords editing.
         """
-        self.status_label.setText("Loading sheet ...")
+        # self.status_label.setText("Loading sheet ...")
 
         self.sheet_pages = []
         self.page_coords = []
@@ -1229,7 +1182,8 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.page_systems.append(np.zeros((0, 4, 2)))
             self.page_bars.append(np.zeros((0, 2, 2)))
 
-        self.spinBox_page.setMaximum(n_pages - 1)
+        if self.gui:
+            self.gui.spinBox_page.setMaximum(n_pages - 1)
 
         self.update_sheet_statistics()
 
@@ -1238,9 +1192,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         # Load MuNG objects, if there are any
         if 'mung' in self.current_score.views:
-            self.load_mung()
+            self.load_mung(update_alignment=update_alignment)
 
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
     def load_mung(self, update_alignment=True):
         """ Loads the Notation Graph representation. """
@@ -1269,8 +1223,10 @@ class SheetManager(QtGui.QMainWindow, form_class):
                      ''.format([len(self._page_centroids2mungo_map[i])
                                 for i in range(len(self.page_mungos))]))
 
-        # if update_alignment:
-        self.update_mung_alignment()
+        if update_alignment:
+            self.update_mung_alignment()
+        else:
+            self.load_mung_alignment()
 
     def load_coords(self):
         """ Load coordinates """
@@ -1282,7 +1238,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
     def load_system_coords(self):
         """ Load system coordinates """
-        self.status_label.setText("Loading system coords ...")
+        # self.status_label.setText("Loading system coords ...")
 
         # prepare paths
         coord_dir = self.current_score.coords_dir
@@ -1297,11 +1253,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # convert systems to rois
         self.systems_to_rois()
 
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
     def load_bar_coords(self):
         """ Load bar coordinates """
-        self.status_label.setText("Loading system coords ...")
+        # self.status_label.setText("Loading system coords ...")
 
         # prepare paths
         coord_dir = self.current_score.coords_dir
@@ -1315,11 +1271,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.sort_bar_coords()
 
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
     def load_note_coords(self):
         """ Load note coordinates """
-        self.status_label.setText("Loading coords ...")
+        # self.status_label.setText("Loading coords ...")
 
         # prepare paths
         coord_dir = self.current_score.coords_dir
@@ -1334,7 +1290,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.sort_note_coords()
 
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
     def systems_to_rois(self):
         """ Convert systems to rois"""
@@ -1361,11 +1317,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                                      bottomLeft]))
 
     def update_mung_alignment(self):
+        """Re-computes the MuNG-notes alignment & saves the new MuNG."""
 
         logging.info('Updating MuNG alignment...')
         if self.page_mungos is None:
             logging.info('...no MuNG loaded!')
             return None
+
         aln = align_score_to_performance(self.current_score,
                                          self.current_performance)
         logging.info('Total aligned pairs: {0}'.format(len(aln)))
@@ -1380,10 +1338,12 @@ class SheetManager(QtGui.QMainWindow, form_class):
             for m in mungos:
                 if m.objid not in self.score_performance_alignment:
                     continue
-                e = self.note_events[self.score_performance_alignment[m.objid]]
+                e_idx = self.score_performance_alignment[m.objid]
+                e = self.note_events[e_idx]
                 onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
                 m.data['{0}_onset_seconds'.format(_perf_name)] = e[0]
                 m.data['{0}_onset_frame'.format(_perf_name)] = int(onset_frame)
+                m.data['{0}_note_event_idx'.format(_perf_name)] = e_idx
 
             page_stats = alignment_stats(mungos,
                                          self.note_events,
@@ -1395,6 +1355,46 @@ class SheetManager(QtGui.QMainWindow, form_class):
                             len(page_stats.mungos_not_aligned_not_tied)))
 
         self.save_mung()
+
+    def _load_mung_alignment(self):
+        """Loads the alignment for the current performance and returns
+        it as a dict: ``objid --> event_idx``."""
+        aln = []
+        _perf_name = self.current_performance.name
+        _onset_seconds_key = '{0}_onset_seconds'.format(_perf_name)
+        _onset_frames_key = '{0}_onset_frames'.format(_perf_name)
+        _event_idx_key = '{0}_note_event_idx'.format(_perf_name)
+        _pitch_key = 'midi_pitch_code'
+
+        _events = self.current_performance.load_note_events()
+        _events_dict = {(e[0], e[1]): i for i, e in enumerate(_events)}
+
+        for i, mungos in enumerate(self.page_mungos):
+            for m in mungos:
+                if _event_idx_key not in m.data:
+                    continue
+
+                e_idx = m.data[_event_idx_key]
+                aln.append((m.objid, e_idx))
+
+        score_performance_alignment = {
+            objid: note_idx
+            for objid, note_idx in aln
+        }
+        return score_performance_alignment
+
+    def load_mung_alignment(self):
+        """Sets the current alignment (``self.score_performance_alignment``)
+        using the current MuNG data. Uses the current performance."""
+        aln_dict = self._load_mung_alignment()
+        self.score_performance_alignment = aln_dict
+
+    def has_alignment(self):
+        aln_dict = self._load_mung_alignment()
+        if len(aln_dict) == 0:
+            return False
+        else:
+            return True
 
     def sort_note_coords(self):
         """ Sort note coordinates by systems (ROIs).
@@ -1449,6 +1449,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
             self.page_bars[page_id] = np.vstack(bars_by_system)
 
+    # -w- GUI
     def update_sheet_statistics(self):
         """ Compute sheet statistics """
 
@@ -1457,10 +1458,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.n_coords = np.sum([len(c) for c in self.page_coords])
         self.n_bars = np.sum([len(s) for s in self.page_bars])
 
-        self.lineEdit_nPages.setText(str(self.n_pages))
-        self.lineEdit_nSystems.setText(str(self.n_systems))
-        self.lineEdit_nCoords.setText(str(self.n_coords))
-        self.lineEdit_nBars.setText(str(self.n_bars))
+        if self.gui:
+            self.gui.lineEdit_nPages.setText(str(self.n_pages))
+            self.gui.lineEdit_nSystems.setText(str(self.n_systems))
+            self.gui.lineEdit_nCoords.setText(str(self.n_coords))
+            self.gui.lineEdit_nBars.setText(str(self.n_bars))
     
     def save_coords(self):
         """ Save changed sheet coords """
@@ -1501,6 +1503,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             coord_file = os.path.join(coord_dir, "systems_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_systems[i])
 
+    # --x GUI
     def edit_coords(self):
         """ Edit sheet elements """
 
@@ -1522,11 +1525,15 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
         self.plot_sheet()
 
+    # r-x GUI, -wx MPL
     def plot_sheet(self, xlim=None, ylim=None):
         """
         Plot sheet image along with coordinates
         """
 
+        if not self.gui:
+            logging.info('Cannot plot sheet without GUI.')
+            return
         # print('Calling plot_sheet')
 
 
@@ -1552,7 +1559,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # print('---orig positions: {0}'.format(prev_toolbar._positions._elements))
 
         # get data of current page
-        page_id = self.spinBox_page.value()
+        page_id = self.gui.spinBox_page.value()
 
         self.fig.clf(keep_observers=True)
 
@@ -1577,7 +1584,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         #   - cobalt: aligned to an event and they are OK
         #   - yellow: not aligned to an event, tied attribute is set
         #   - red: not aligned to an event, tied attribute is NOT set
-        if self.checkBox_showCoords.isChecked():
+        if self.gui.checkBox_showCoords.isChecked():
             if self._page_mungo_centroids is not None:
                 mcentroids = self._page_mungo_centroids[page_id]
                 # Split MuNG objects based on whether they are aligned or not
@@ -1618,7 +1625,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
                 plt.plot(self.page_coords[page_id][:, 1], self.page_coords[page_id][:, 0], 'co', alpha=0.6)
 
         # plot systems
-        if self.checkBox_showSystems.isChecked():
+        if self.gui.checkBox_showSystems.isChecked():
             patches = []
             for system in self.page_systems[page_id]:
                 polygon = Polygon(system[:, ::-1], True)
@@ -1628,7 +1635,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             ax.add_collection(p)
 
         # plot rois
-        if self.checkBox_showRois.isChecked():
+        if self.gui.checkBox_showRois.isChecked():
             patches = []
             for roi in self.page_rois[page_id]:
                 polygon = Polygon(roi[:, ::-1], True)
@@ -1638,7 +1645,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             ax.add_collection(p)
 
         # plot bars
-        if self.checkBox_showBars.isChecked():
+        if self.gui.checkBox_showBars.isChecked():
             for i, bar in enumerate(self.page_bars[page_id]):
                 plt.plot(bar[:, 1], bar[:, 0], 'b-', linewidth=2, alpha=0.6)
                 plt.text(bar[0, 1], bar[0, 0], i, color='b', ha='center', va='bottom',
@@ -1687,6 +1694,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         # print('Positions after drawing 2x: ')
         # print(plt.gcf().canvas.toolbar._positions._elements)
 
+    # rwx MPL
     def on_press(self, event):
         """
         Scatter plot mouse button down event
@@ -1695,6 +1703,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.click_0 = [event.ydata, event.xdata]
         self.drawObjects = []
 
+    # rwx MPL
     def on_motion(self, event):
         """
         Scatter plot mouse move event
@@ -1724,6 +1733,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
 
             plt.draw()
 
+    # rwx MPL, r-- GUI
     def on_release(self, event):
         """
         Sheet has been clicked event
@@ -1744,7 +1754,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         self.drawObjects = []
 
         # current page
-        page_id = self.spinBox_page.value()
+        page_id = self.gui.spinBox_page.value()
         
         # position of click
         clicked = np.asarray([event.ydata, event.xdata]).reshape([1, 2])
@@ -1837,11 +1847,11 @@ class SheetManager(QtGui.QMainWindow, form_class):
             return
 
         # check for editing mode
-        if not self.checkBox_editSheet.isChecked() and event.button == 1:
+        if not self.gui.checkBox_editSheet.isChecked() and event.button == 1:
             return
 
         # add system position
-        if self.radioButton_addSystem.isChecked():
+        if self.gui.radioButton_addSystem.isChecked():
 
             # compile system coordinates
             system_coords = np.zeros((4, 2))
@@ -1863,7 +1873,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.systems_to_rois()
 
         # remove system position
-        if self.radioButton_deleteSystem.isChecked():
+        if self.gui.radioButton_deleteSystem.isChecked():
             import matplotlib.path as mpltPath
 
             # find selected system
@@ -1880,7 +1890,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.systems_to_rois()
 
         # add bar position
-        if self.radioButton_addBar.isChecked():
+        if self.gui.radioButton_addBar.isChecked():
 
             # get closest system
             page_systems = self.page_systems[page_id]
@@ -1908,7 +1918,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.click_0 = None
 
         # remove bar position
-        if self.radioButton_deleteBar.isChecked():
+        if self.gui.radioButton_deleteBar.isChecked():
 
             # find closets note
             dists = pairwise_distances(clicked, self.page_bars[page_id].mean(1))
@@ -1919,7 +1929,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             logging.info("Removed bar with id:", selection)
 
         # add note position
-        if self.radioButton_addNote.isChecked():
+        if self.gui.radioButton_addNote.isChecked():
 
             # find closets note
             if self.page_coords[page_id].shape[0] > 0:
@@ -1931,7 +1941,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
             self.page_coords[page_id] = np.insert(self.page_coords[page_id], selection + 1, clicked, axis=0)
 
         # remove note position
-        if self.radioButton_deleteNote.isChecked():
+        if self.gui.radioButton_deleteNote.isChecked():
             
             # find closets note
             dists = pairwise_distances(clicked, self.page_coords[page_id])
@@ -1952,12 +1962,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
         xlim, ylim = plt.gca().get_xlim(), plt.gca().get_ylim()
         self.plot_sheet(xlim=xlim, ylim=ylim)
 
+    # r-- GUI
     def update_staff_windows(self):
         """
         Update staff windows
         """
-        self.window_top = self.spinBox_window_top.value()
-        self.window_bottom = self.spinBox_window_bottom.value()
+        self.window_top = self.gui.spinBox_window_top.value()
+        self.window_bottom = self.gui.spinBox_window_bottom.value()
     
     def match_audio2sheet(self):
         """
@@ -1968,7 +1979,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
     def init_omr(self):
         """ Initialize omr module """
         logging.info('Initializing omr ...')
-        self.status_label.setText("Initializing omr ...")
+        # self.status_label.setText("Initializing omr ...")
 
         # select model
         try:
@@ -2007,8 +2018,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
                                           system_detector=system_net,
                                           bar_detector=bar_net)
 
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
+    # r-- GUI
     def detect_note_heads(self):
         """ Detect note heads in current image """
         try:
@@ -2018,13 +2030,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
             return
 
         logging.info('Detecting note heads ...')
-        self.status_label.setText("Detecting note heads ...")
+        # self.status_label.setText("Detecting note heads ...")
 
         if self.omr is None:
             self.init_omr()
 
         # prepare current image for detection
-        page_id = self.spinBox_page.value()
+        page_id = self.gui.spinBox_page.value()
         img = prepare_image(self.sheet_pages[page_id])
 
         # detect note heads
@@ -2040,8 +2052,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         if self.fig is not None:
             self.plot_sheet()
 
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
+    # r-- GUI
     def detect_bars(self):
         """ Detect bars in current image """
         try:
@@ -2051,13 +2064,13 @@ class SheetManager(QtGui.QMainWindow, form_class):
             return
 
         logging.info('Detecting bars ...')
-        self.status_label.setText("Detecting bars ...")
+        # self.status_label.setText("Detecting bars ...")
 
         if self.omr is None:
             self.init_omr()
 
         # prepare current image for detection
-        page_id = self.spinBox_page.value()
+        page_id = self.gui.spinBox_page.value()
         img = prepare_image(self.sheet_pages[page_id])
 
         # detect note heads
@@ -2073,8 +2086,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
         if self.fig is not None:
             self.plot_sheet()
 
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
+    # r-- GUI
     def detect_systems(self, with_omr=False):
         """ Detect system regions in current image.
 
@@ -2084,9 +2098,9 @@ class SheetManager(QtGui.QMainWindow, form_class):
             perfectly horizontal.
         """
         logging.info('Detecting systems ...')
-        self.status_label.setText("Detecting systems ...")
+        # self.status_label.setText("Detecting systems ...")
 
-        page_id = self.spinBox_page.value()
+        page_id = self.gui.spinBox_page.value()
         self.detect_systems_on_page(page_id, with_omr=with_omr)
 
     def detect_systems_on_page(self, page_id, with_omr):
@@ -2156,7 +2170,7 @@ class SheetManager(QtGui.QMainWindow, form_class):
         if self.fig is not None:
             self.plot_sheet()
 
-        self.status_label.setText("done!")
+        # self.status_label.setText("done!")
 
     def _mungo_onset_frame_for_current_performance(self, mungo):
         """Helper method."""
@@ -2217,8 +2231,12 @@ def build_argument_parser():
                         help='[CLI] Process all the pieces in the data_dir.'
                              ' Equivalent to -p `ls $DATA_DIR`.')
     parser.add_argument('--first_k', type=int, action='store', default=None,
-                        help='[CLI] Only process the frist K pieces in the data dir.'
+                        help='[CLI] Only process the first K pieces in the data dir.'
                              ' Equivalent to -p `ls $DATA_DIR | head -n $K`.')
+    parser.add_argument('--last_k', type=int, action='store', default=None,
+                        help='[CLI] Only process the last K pieces in the data dir.'
+                             ' Useful for 2-core parallelization on a desktop'
+                             ' machine.')
 
     parser.add_argument('--retain_audio', action='store_true',
                         help='If set, will retain the rendered audio files,'
@@ -2265,13 +2283,13 @@ def launch_gui(args):
         logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
     app = QtGui.QApplication(sys.argv)
-    myWindow = SheetManager()
+    myWindow = SheetManager(interactive=True)
     if args.data_dir:
         if len(args.pieces) > 0:
             piece = args.pieces[0]
             piece_dir = os.path.join(args.data_dir, piece)
             myWindow.load_piece(piece_dir)
-    myWindow.show()
+    myWindow.gui.show()
     app.exec_()
 
 
@@ -2291,6 +2309,10 @@ def run_batch_mode(args):
         pieces = [p for p in sorted(os.listdir(data_dir))
                   if os.path.isdir(os.path.join(data_dir, p))]
         pieces = pieces[:args.first_k]
+    elif args.last_k:
+        pieces = [p for p in sorted(os.listdir(data_dir))
+                  if os.path.isdir(os.path.join(data_dir, p))]
+        pieces = pieces[-args.last_k:]
 
     piece_dirs = []
     for p in pieces:
@@ -2305,7 +2327,7 @@ def run_batch_mode(args):
         raise OSError('Config file does not exist: {0}'.format(config_file))
 
     # We need to initialize the app to give PyQT all the context it expects
-    app = QtGui.QApplication(sys.argv, False)
+    # app = QtGui.QApplication(sys.argv, False)
     mgr = SheetManager(interactive=False)
     # Does not do mgr.show()!
     # app.exec_()
@@ -2330,22 +2352,58 @@ def run_batch_mode(args):
 
         try:
             if args.stats_only:
-                page_stats, global_stats = mgr.get_stats_of_piece(piece_dir)
+                page_stats, global_stats = mgr.get_stats_of_piece(piece_dir,
+                                                                  require_alignment=True)
+                print('Piece stats: ', len(global_stats._asdict().items()))
+
+                # Build metadata from the stats
+                print('Piece metadata: {0}'.format(mgr.piece.metadata))
+                if (mgr.piece.metadata is None) or (len(mgr.piece.metadata) == 0):
+                    print('\tBuilding metadata...')
+                    mgr.piece.metadata['n_pages'] = mgr.n_pages
+                    mgr.piece.metadata['n_performances'] = len(mgr.piece.performances)
+                    mgr.piece.metadata['n_scores'] = len(mgr.piece.scores)
+                    mgr.piece.metadata['aln_piece_stats'] = dict([kv for kv in global_stats._asdict().items()
+                                                                   if isinstance(kv[1], int)])
+                    mgr.piece.metadata['aln_page_stats'] = [dict([kv for kv in s._asdict().items()
+                                                                   if isinstance(kv[1], int)])
+                                                             for s in page_stats.values()]
+
+                    # Coming up with the processing & alignment flags if the piece didn't have any.
+                    if any(is_aln_problem(stats) for stats in page_stats.values()):
+                        mgr.piece.metadata['aligned_well'] = False
+                    elif is_aln_problem(global_stats):
+                        mgr.piece.metadata['aligned_well'] = False
+                    else:
+                        mgr.piece.metadata['aligned_well'] = True
+                        mgr.piece.metadata['processed'] = True
+
+                    mgr.piece.dump_metadata()
+
+                _metadata = mgr.piece.metadata
+
+                if _metadata['processed']:
+                    success_pieces.append((piece, piece_dir))
+                else:
+                    failed_pieces.append((piece, piece_dir))
+
             else:
                 page_stats, global_stats = mgr.process_piece(piece_dir, workflow="ly")
 
+                success_pieces.append((piece, piece_dir))
+
+                # Only generate the processing success flags if the piece
+                # actually has been processed.
+                if mgr.piece.metadata['processed']:
+                    if any(is_aln_problem(stats) for stats in page_stats.values()):
+                        mgr.piece.metadata['aligned_well'] = False
+                    elif is_aln_problem(global_stats):
+                        mgr.piece.metadata['aligned_well'] = False
+                    else:
+                        mgr.piece.metadata['aligned_well'] = True
+                    mgr.piece.dump_metadata()
+
             piece_stats[piece] = page_stats, global_stats
-
-            success_pieces.append((piece, piece_dir))
-
-            mgr.piece.metadata['processed'] = True
-            if any(is_aln_problem(stats) for stats in page_stats.values()):
-                mgr.piece.metadata['aligned_well'] = False
-            elif is_aln_problem(global_stats):
-                mgr.piece.metadata['aligned_well'] = False
-            else:
-                mgr.piece.metadata['aligned_well'] = True
-            mgr.piece.dump_metadata()
 
         except Exception as mgre:
             print('Error: {0}'.format(mgre))
@@ -2417,7 +2475,7 @@ def run_batch_mode(args):
     print('Pieces without alignment problems: {0}'
           ''.format(n_successfully_aligned))
     print('Success rate: {0:.2f}'
-          ''.format(float(n_successfully_aligned) / len(args.pieces)))
+          ''.format(float(n_successfully_aligned) / len(pieces)))
 
     print('\nUseful aligned notes: {0}'.format(n_useful_notes))
 

@@ -102,49 +102,92 @@ of course be parallelized.
 Extracting alignment
 ====================
 
-### give piece dir
-collection_dir = '/home/matthias/cp/data/msmd'
-piece_name = 'BachCPE__cpe-bach-rondo__cpe-bach-rondo'
-piece_dir = os.path.join(collection_dir, piece_name)
+Get directory names:
 
-app = QtGui.QApplication(sys.argv)
-mgr = SheetManager()
+```
+    collection_dir = '/home/matthias/cp/data/msmd'
+    piece_name = 'BachCPE__cpe-bach-rondo__cpe-bach-rondo'
+    piece_dir = os.path.join(collection_dir, piece_name)
+```
 
-# Piece loading
+Initialize SheetManager:
 
-from sheet_manager.data_model.piece import Piece
-piece = Piece(root=collection_dir, name=piece_name)
-score = piece.load_score(piece.available_scores[0])
-performance = piece.load_performance(piece.available_performances[0], require_audio=False)
+```
+    mgr = SheetManager(interactive=False)
+```
 
-# Running the alignment procedure
+To load a piece, its score and performance (assuming at least one of each
+is available):
 
-from sheet_manager.alignments import align_score_to_performance
-alignment = align_score_to_performance(score, performance)
+```
+    from sheet_manager.data_model.piece import Piece
+    piece = Piece(root=collection_dir, name=piece_name)
+    score = piece.load_score(piece.available_scores[0])
+    performance = piece.load_performance(piece.available_performances[0],
+                                         require_audio=False)
+```
+
+Now, you can run the alignment procedure to align the score's noteheads
+to the note events in the performance. You only pass the ``Score``
+and ``Performance`` objects:
+
+```
+    from sheet_manager.alignments import align_score_to_performance
+    alignment = align_score_to_performance(score, performance)
+```
+
+The alignment contains pairs ``m_objid, e_idx``. The ``m_objid`` is a unique
+identifier of a MuNG notehead within the piece. The ``e_idx`` is a row index
+into the matrix of note events, as the ``madmom`` package extracts it from
+the MIDI file:
+
+```
+    m_objid, e_idx = alignment[0]
+```
+
+To use the alignment to retrieve aligned MuNGos and note events,
+prepare the retrieved objects:
+
+```
+    note_events = performance.load_note_events()
+    mungos = score.load_mungos()
+    mdict = {m.objid: m for m in mungos}
+```
+
+and use the aligned ``m_objid`` and ``e_idx`` pointers to retrieve them:
+
+```
+    m, e = mdict[m_objid], note_events[e_idx]
+```
 
 
+...this is now the aligned pair of the MuNG object representing the note(head) in the score,
+   and the MIDI note event.
 
-# Inspect the alignemnt
+To get the image patch associated with a MuNG object, you also need to know
+which page it is coming from, so that you interpret its location correctly.
+You can thus for instance retrieve patches of the image centered around the
+given notehead:
 
-m_objid, e_idx = alignment[0]
+```
+    mungos_per_page = score.load_mungos(by_page=True)
+    mungo_to_page = {}
+    for i, ms in enumerate(mungos_per_page):
+        for _m in ms:
+        mungo_to_page[_m.objid] = i
+    imgs = score.load_images()
 
-note_events = performance.load_note_events()
-mungos = score.load_mungos()
-mdict = {m.objid: m for m in mungos}
+    x, y = m.middle
+    PATCH_HEIGHT, PATCH_WIDTH = 256, 512
+    top, bottom = x - PATCH_HEIGHT * 0.5, x + PATCH_HEIGHT * 0.5
+    left, right = y - PATCH_WIDTH * 0.5, y + PATCH_WIDTH * 0.5
 
+    page_no = mungo_to_page[m.objid]
 
-# To retrieve also the page where the individual MuNGs are
-mungos_per_page = score.load_mungos(by_page=True)
-mungo_to_page = {}
-for i, ms in enumerate(mungos_per_page):
-	for m in ms:
-  	mungo_to_page[m.objid] = i
+    image_patch = imgs[page_no][top:bottom, left:right]
 
+```
 
-
-m, e = mdict[m_objid], note_events[e_idx]
-# ...this is now the aligned pair of the MuNG object representing the note(head) in the score,
-#    and the MIDI note event.
 
 
 
@@ -171,8 +214,6 @@ it, il, ib, ir = CropObject.bbox_to_integer_bounds(ft, fl, fb, fr)
 
 images = score.load_images()
 img = images[m_page]
-
-
 
 ### Compute system coordinates
 

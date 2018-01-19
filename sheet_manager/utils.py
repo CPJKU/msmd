@@ -1,11 +1,16 @@
 
 from __future__ import print_function
 
+import collections
+
 import numpy as np
 import matplotlib.path as mplPath
 
 
 # init color printer
+import yaml
+
+
 class BColors:
     """
     Colored command line output formatting
@@ -120,3 +125,90 @@ def corners2bbox(corners):
     t, l = corners[0]
     b, r = corners[2]
     return t, l, b, r
+
+
+def aggregate_dicts(dicts):
+    output = collections.defaultdict(list)
+    for d in dicts:
+        for k, v in d.items():
+            output[k].append(v)
+    return output
+
+
+def reduce_dicts(dicts, fn, **fn_kwargs):
+    aggregate = aggregate_dicts(dicts)
+    average = {k: fn(v, **fn_kwargs)
+               for k, v in aggregate.items()}
+    return average
+
+
+def msmd_stats_latex(msmd, split_file, split_name, caption=None, label=None):
+    train_stats, valid_stats, test_stats = msmd.stats_on_split(split_file)
+
+    stats = {'train': train_stats, 'valid': valid_stats, 'test': test_stats}
+
+    with open(split_file, 'rb') as hdl:
+        split = yaml.load(hdl)
+    n_train_pieces = len(split['train'])
+    n_valid_pieces = len(split['valid'])
+    n_test_pieces = len(split['test'])
+    n_pieces = {'train': n_train_pieces,
+                'valid': n_valid_pieces,
+                'test': n_test_pieces}
+
+    n_total_pieces = n_train_pieces + n_valid_pieces + n_test_pieces
+    n_total_aln = train_stats['n_aln_pairs'] \
+                  + valid_stats['n_aln_pairs'] \
+                  + test_stats['n_aln_pairs']
+
+    # Table header
+    lines = list()
+    lines.append('\\begin{table}[ht]')
+    lines.append('\t\\begin{center}')
+    lines.append('\t\\begin{tabular}{rcrcccc}')
+    lines.append('\t\\toprule')
+    lines.append('\t\\textbf{Split Name} &'
+                 ' \\textbf{\\# Pieces/Aln. Pairs} &'
+                 ' \\textbf{Part} &'
+                 ' \\textbf{\\# Pieces} &'
+                 ' \\textbf{\\# Noteheads} &'
+                 ' \\textbf{\\# Events} &'
+                 ' \\textbf{\\# Aln. Pairs} \\\\')
+    lines.append('\t\\midrule')
+
+    # Stats lines
+    for line_name in ('train', 'valid', 'test'):
+        current_stats = stats[line_name]
+
+        fields = []
+        # First line for given split has the split header fields
+        if line_name == 'train':
+            fields.append(split_name)
+            fields.append('{0} / {1}'.format(n_total_pieces, n_total_aln))
+        else:
+            fields.extend(['', ''])
+
+        fields.append(line_name)
+
+        fields.append(n_pieces[line_name])
+        n_noteheads = current_stats['n_mungos'] - current_stats['n_system_mungos']
+        fields.append(n_noteheads)
+        fields.append(current_stats['n_events'])
+        fields.append(current_stats['n_aln_pairs'])
+
+        line = '\t' + ' & '.join(map(str, fields))
+        line += ' \\\\'
+
+        lines.append(line)
+    lines.append('\t\\bottomrule')
+
+    # Table footer
+    lines.append('\t\\end{tabular}')
+    lines.append('\t\\end{center}')
+    if caption is not None:
+        lines.append('\t\\caption{{0}}'.format(caption))
+    if label is not None:
+        lines.append('\t\\label{{0}}'.format(label))
+    lines.append('\\end{table}')
+
+    return '\n'.join(lines)
