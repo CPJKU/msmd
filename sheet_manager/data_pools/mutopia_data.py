@@ -47,10 +47,13 @@ def load_piece_list(piece_names, aug_config=NO_AUGMENT):
     return all_images, all_specs, all_o2c_maps
 
 
-def load_piece_list_midi(piece_names, aug_config=NO_AUGMENT):
+def load_piece_list_midi(piece_names, aug_config=NO_AUGMENT, data_root=None):
     """
     Collect piece data
     """
+    if not data_root:
+        data_root = DATA_ROOT_MSMD
+
     all_images = []
     all_specs = []
     all_o2c_maps = []
@@ -59,7 +62,7 @@ def load_piece_list_midi(piece_names, aug_config=NO_AUGMENT):
         piece_name = piece_names[ip]
 
         try:
-            image, specs, o2c_maps, midi_mats = prepare_piece_data(DATA_ROOT_MSMD, piece_name, aug_config=aug_config,
+            image, specs, o2c_maps, midi_mats = prepare_piece_data(data_root, piece_name, aug_config=aug_config,
                                                                    require_audio=False, load_midi_matrix=True)
         except Exception as e:
             print("Problems with loading piece %s" % piece_name)
@@ -130,7 +133,8 @@ def load_audio_score_retrieval(split_file, config_file=None, test_only=False):
     return dict(train=tr_pool, valid=va_pool, test=te_pool, train_tag="")
 
 
-def load_score_informed_transcription(split_file, config_file=None, test_only=False):
+def load_score_informed_transcription(split_file, config_file=None, test_only=False,
+                                      data_root=None):
     """
     Load alignment data
     """
@@ -159,13 +163,13 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
 
     # initialize data pools
     if not test_only:
-        tr_images, tr_specs, tr_o2c_maps, tr_midis = load_piece_list_midi(split['train'], aug_config=augment)
+        tr_images, tr_specs, tr_o2c_maps, tr_midis = load_piece_list_midi(split['train'], aug_config=augment, data_root=data_root)
         tr_pool = ScoreInformedTranscriptionPool(tr_images, tr_specs, tr_o2c_maps, tr_midis,
                                                  spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
                                                  data_augmentation=augment, shuffle=True)
         print("Train: %d" % tr_pool.shape[0])
 
-        va_images, va_specs, va_o2c_maps, va_midis = load_piece_list_midi(split['valid'], aug_config=no_augment)
+        va_images, va_specs, va_o2c_maps, va_midis = load_piece_list_midi(split['valid'], aug_config=no_augment, data_root=data_root)
         va_pool = ScoreInformedTranscriptionPool(va_images, va_specs, va_o2c_maps, va_midis,
                                                  spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
                                                  data_augmentation=no_augment, shuffle=False)
@@ -175,7 +179,7 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
     else:
         tr_pool = va_pool = None
 
-    te_images, te_specs, te_o2c_maps, te_midis = load_piece_list_midi(split['test'], aug_config=test_augment)
+    te_images, te_specs, te_o2c_maps, te_midis = load_piece_list_midi(split['test'], aug_config=test_augment, data_root=data_root)
     te_pool = ScoreInformedTranscriptionPool(te_images, te_specs, te_o2c_maps, te_midis,
                                              spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
                                              data_augmentation=no_augment, shuffle=False)
@@ -256,12 +260,12 @@ if __name__ == "__main__":
         batch_iterator = TripleviewPoolIteratorUnsupervised(batch_size=batch_size, prepare=prepare, k_samples=None)
         return batch_iterator
 
-    split_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "splits", "bach_split.yaml")
+    split_file = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "splits", "bach_split.yaml")
 
     # Hack for experimental config
     config_file = "/home/matthias/cp/src/audio_sheet_retrieval/audio_sheet_retrieval/exp_configs/mutopia_no_aug.yaml"
     if not os.path.isfile(config_file):
-        config_file = "/Users/hajicj/jku/gitlab/audio_sheet_retrieval/audio_sheet_retrieval/exp_configs/mutopia_no_aug.yaml"
+        config_file = "/Users/hajicj/jku/gitlab/multimodal_transcription/multimodal_transcription/exp_configs/trans_mutopia_no_aug.yaml"
     if not os.path.isfile(config_file):
         raise OSError('Experiment config file mutopia_no_aug.yaml not found in any of the expected locations.')
 
