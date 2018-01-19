@@ -1,11 +1,12 @@
 
 from __future__ import print_function
 
+import os
 import sys
 import yaml
 from tqdm import tqdm
 
-from audio_sheet_retrieval.config.settings import DATA_ROOT_MSMD
+from sheet_manager.DEFAULT_CONFIG import DATA_ROOT_MSMD
 from sheet_manager.data_pools.data_pools import prepare_piece_data, AudioScoreRetrievalPool, AUGMENT, NO_AUGMENT
 from sheet_manager.data_pools.data_pools import SPEC_CONTEXT, SHEET_CONTEXT, SYSTEM_HEIGHT
 
@@ -60,9 +61,10 @@ def load_piece_list_midi(piece_names, aug_config=NO_AUGMENT):
         try:
             image, specs, o2c_maps, midi_mats = prepare_piece_data(DATA_ROOT_MSMD, piece_name, aug_config=aug_config,
                                                                    require_audio=False, load_midi_matrix=True)
-        except:
+        except Exception as e:
             print("Problems with loading piece %s" % piece_name)
             print(sys.exc_info()[0])
+            raise e
             continue
 
         # keep stuff
@@ -254,10 +256,18 @@ if __name__ == "__main__":
         batch_iterator = TripleviewPoolIteratorUnsupervised(batch_size=batch_size, prepare=prepare, k_samples=None)
         return batch_iterator
 
+    split_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), "splits", "bach_split.yaml")
+
+    # Hack for experimental config
+    config_file = "/home/matthias/cp/src/audio_sheet_retrieval/audio_sheet_retrieval/exp_configs/mutopia_no_aug.yaml"
+    if not os.path.isfile(config_file):
+        config_file = "/Users/hajicj/jku/gitlab/audio_sheet_retrieval/audio_sheet_retrieval/exp_configs/mutopia_no_aug.yaml"
+    if not os.path.isfile(config_file):
+        raise OSError('Experiment config file mutopia_no_aug.yaml not found in any of the expected locations.')
 
     data = load_score_informed_transcription(
-        split_file="/home/matthias/cp/src/sheet_manager/sheet_manager/splits/bach_split.yaml",
-        config_file="/home/matthias/cp/src/audio_sheet_retrieval/audio_sheet_retrieval/exp_configs/mutopia_no_aug.yaml",
+        split_file=split_file,
+        config_file=config_file,
         test_only=True)
 
     bi = train_batch_iterator(batch_size=5)

@@ -9,7 +9,7 @@ try:
 except ImportError:
 
     # Data root
-    DATA_ROOT = '~/data/MSMD/msmd_aug'
+    DATA_ROOT_MSMD = '/Users/hajicj/data/MSMD/msmd_aug'
     # get hostname
     hostname = os.uname()[1]
 
