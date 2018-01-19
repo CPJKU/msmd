@@ -1,7 +1,7 @@
 
 import yaml
 import numpy as np
-from data_pools import prepare_piece_data
+from audio_sheet_retrieval.utils.data_pools import prepare_piece_data
 
 
 compute_note_counts = False
@@ -13,8 +13,6 @@ if __name__ == "__main__":
     collection_dir = '/media/matthias/Data/msmd/'
     piece_file = "/home/matthias/cp/src/sheet_manager/sheet_manager/splits/all_pieces.yaml"
     count_file = piece_file.replace(".yaml", "_counts.yaml")
-
-    split_file = "/home/matthias/cp/src/sheet_manager/sheet_manager/splits/bach_out_split.yaml"
 
     # compute note counts for piece list
     if compute_note_counts:

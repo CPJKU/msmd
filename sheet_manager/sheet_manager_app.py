@@ -1631,7 +1631,7 @@ class SheetManager(object):
                 polygon = Polygon(system[:, ::-1], True)
                 patches.append(polygon)
 
-            p = PatchCollection(patches, color='r', alpha=0.2)
+            p = PatchCollection(patches, color='k', alpha=0.2)
             ax.add_collection(p)
 
         # plot rois
@@ -1641,7 +1641,7 @@ class SheetManager(object):
                 polygon = Polygon(roi[:, ::-1], True)
                 patches.append(polygon)
 
-            p = PatchCollection(patches, color='k', alpha=0.2)
+            p = PatchCollection(patches, color='r', alpha=0.2)
             ax.add_collection(p)
 
         # plot bars
@@ -1839,7 +1839,7 @@ class SheetManager(object):
                     plt.plot([_aln_onset], [_aln_pitch], 'bo', alpha=0.5)
                 plt.ylim([0, self.midi_matrix.shape[0]])
                 plt.xlim([x_min, x_max])
-                plt.ylabel("%d Midi Pitches" % self.midi_matrix.shape[0])
+                plt.ylabel("%d Midi Pitches" % self.midi_matrix.shape[0], fontsize=self.axis_label_fs)
                 plt.xlabel('Frame', fontsize=self.axis_label_fs)
 
             plt.draw()
