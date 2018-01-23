@@ -1,6 +1,8 @@
 
 from __future__ import print_function
 
+import logging
+
 import numpy as np
 from scipy.interpolate import interp1d
 
@@ -576,35 +578,35 @@ def prepare_piece_data(collection_dir, piece_name, aug_config=NO_AUGMENT, requir
     :return:
     """
 
-    print("\n")
-    print("{0}:\tPiece loading".format(piece_name))
+    logging.info("\n")
+    logging.info("{0}:\tPiece loading".format(piece_name))
     piece = Piece(root=collection_dir, name=piece_name)
-    print("{0}:\tScore loading".format(piece_name))
+    logging.info("{0}:\tScore loading".format(piece_name))
     score = piece.load_score(piece.available_scores[0])
 
-    print("{0}:\tMuNGo loading".format(piece_name))
+    logging.info("{0}:\tMuNGo loading".format(piece_name))
     mungos = score.load_mungos()
     mdict = {m.objid: m for m in mungos}
     mungos_per_page = score.load_mungos(by_page=True)
 
-    print("{0}:\tImage loading".format(piece_name))
+    logging.info("{0}:\tImage loading".format(piece_name))
     images = score.load_images()
 
     # stack sheet images
-    print("{0}:\tImage stacking".format(piece_name))
+    logging.info("{0}:\tImage stacking".format(piece_name))
     image, page_mungos, mdict = stack_images(images, mungos_per_page, mdict)
 
     # get only system mungos for unwrapping
-    print("{0}:\tSystem MuNGo loading".format(piece_name))
+    logging.info("{0}:\tSystem MuNGo loading".format(piece_name))
     system_mungos = [c for c in page_mungos if c.clsname == 'staff']
     system_mungos = sorted(system_mungos, key=lambda m: m.top)
 
     # unwrap sheet images
-    print("{0}:\tSheet image unrollilng".format(piece_name))
+    logging.info("{0}:\tSheet image unrollilng".format(piece_name))
     un_wrapped_image, un_wrapped_coords = unwrap_sheet_image(image, system_mungos, mdict)
 
     # load performances
-    print("{0}:\tPerformance loading".format(piece_name))
+    logging.info("{0}:\tPerformance loading".format(piece_name))
     spectrograms = []
     midi_matrices = []
     onset_to_coord_maps = []
