@@ -175,7 +175,7 @@ MuNG format and Alignment
 
 The MuNG XML for a notehead in MSMD looks like this:
 
-<CropObject xml:id="msmd_aug___BachCPE__cpe-bach-rondo__cpe-bach-rondo_ly-P00___0>
+<CropObject xml:id="msmd_aug___BachCPE__cpe-bach-rondo__cpe-bach-rondo_ly-P00___0">
   <Id>0</Id>
   <ClassName>notehead-full</ClassName>
   <Top>118</Top>
@@ -237,8 +237,9 @@ the MuNG format, but are an MSMD-specific extension of MuNG.
   associated with this notehead. This information is extracted from
   the originating LilyPond file (see Appendix A of [1]).
 
-To load MuNG files & use this representation, we strongly recommend using
-the muscima package (https://github.com/hajicj/muscima).
+To load MuNG files and use this representation, we recommend using
+the muscima package (https://github.com/hajicj/muscima) of the MuNG format
+authors.
 
 
 Manipulating MSMD
