@@ -572,7 +572,6 @@ def unwrap_sheet_image(image, system_mungos, mdict, window_top=100, window_botto
 
 def prepare_piece_data(collection_dir, piece_name, aug_config=NO_AUGMENT, require_audio=True, load_midi_matrix=False):
     """
-
     :param collection_dir:
     :param piece_name:
     :return:
