@@ -134,7 +134,7 @@ def load_audio_score_retrieval(split_file, config_file=None, test_only=False):
 
 
 def load_score_informed_transcription(split_file, config_file=None, test_only=False,
-                                      data_root=None):
+                                      data_root=None, no_test=False):
     """
     Load alignment data
     """
@@ -162,6 +162,7 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
     split = load_split(split_file)
 
     # initialize data pools
+    tr_pool, va_pool = None, None
     if not test_only:
         tr_images, tr_specs, tr_o2c_maps, tr_midis = load_piece_list_midi(split['train'], aug_config=augment, data_root=data_root)
         tr_pool = ScoreInformedTranscriptionPool(tr_images, tr_specs, tr_o2c_maps, tr_midis,
@@ -179,11 +180,13 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
     else:
         tr_pool = va_pool = None
 
-    te_images, te_specs, te_o2c_maps, te_midis = load_piece_list_midi(split['test'], aug_config=test_augment, data_root=data_root)
-    te_pool = ScoreInformedTranscriptionPool(te_images, te_specs, te_o2c_maps, te_midis,
-                                             spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
-                                             data_augmentation=no_augment, shuffle=False)
-    print("Test: %d" % te_pool.shape[0])
+    te_pool = None
+    if not no_test:
+        te_images, te_specs, te_o2c_maps, te_midis = load_piece_list_midi(split['test'], aug_config=test_augment, data_root=data_root)
+        te_pool = ScoreInformedTranscriptionPool(te_images, te_specs, te_o2c_maps, te_midis,
+                                                 spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
+                                                 data_augmentation=no_augment, shuffle=False)
+        print("Test: %d" % te_pool.shape[0])
 
     return dict(train=tr_pool, valid=va_pool, test=te_pool, train_tag="")
 
