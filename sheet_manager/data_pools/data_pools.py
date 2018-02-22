@@ -640,7 +640,6 @@ def prepare_piece_data(collection_dir, piece_name, aug_config=NO_AUGMENT, requir
 
         # load spectrogram
         spec = performance.load_spectrogram()
-        spectrograms.append(spec)
 
         # compute onset to coordinate mapping
         onset_to_coord = onset_to_coordinates(alignment, un_wrapped_coords, note_events)
@@ -650,9 +649,14 @@ def prepare_piece_data(collection_dir, piece_name, aug_config=NO_AUGMENT, requir
             midi = performance.load_midi_matrix()
 
             if midi.shape[1] != spec.shape[1]:
-                raise ValueError('Perf {0}: Midi matrix and spectrogram have a different number of frames: MM {1}, spec {2}'
-                                 ''.format(performance_key, midi.shape[1], spec.shape[1]))
+                print('Perf {0}: Midi matrix and spectrogram have a different number of frames: MM {1}, spec {2}'
+                      ''.format(performance_key, midi.shape[1], spec.shape[1]))
+                n_frames = min(midi.shape[1], spec.shape[1])
+                midi = midi[:, :n_frames]
+                spec = spec[:, :n_frames]
+
             midi_matrices.append(midi)
+        spectrograms.append(spec)
 
     if load_midi_matrix:
         return un_wrapped_image, spectrograms, onset_to_coord_maps, midi_matrices
