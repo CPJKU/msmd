@@ -145,15 +145,20 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
         staff_height = SYSTEM_HEIGHT
         augment = AUGMENT
         no_augment = NO_AUGMENT
+        va_augment = NO_AUGMENT.copy()
         test_augment = NO_AUGMENT.copy()
     else:
         with open(config_file, 'rb') as hdl:
             config = yaml.load(hdl)
+        if "VA_AUGMENT" not in config:
+            config["VA_AUGMENT"] = config["AUGMENT"]
+
         spec_context = config["SPEC_CONTEXT"]
         sheet_context = config["SHEET_CONTEXT"]
         staff_height = config["SYSTEM_HEIGHT"]
         augment = config["AUGMENT"]
         no_augment = NO_AUGMENT
+        va_augment = config["VA_AUGMENT"]
         test_augment = NO_AUGMENT.copy()
         test_augment['synths'] = [config["TEST_SYNTH"]]
         test_augment['tempo_range'] = [config["TEST_TEMPO"], config["TEST_TEMPO"]]
@@ -172,7 +177,7 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
         va_images, va_specs, va_o2c_maps, va_midis = load_piece_list_midi(split['valid'], aug_config=no_augment, data_root=data_root)
         va_pool = ScoreInformedTranscriptionPool(va_images, va_specs, va_o2c_maps, va_midis,
                                                  spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
-                                                 data_augmentation=no_augment, shuffle=False)
+                                                 data_augmentation=va_augment, shuffle=False)
         va_pool.reset_batch_generator()
         print("Valid: %d" % va_pool.shape[0])
 
