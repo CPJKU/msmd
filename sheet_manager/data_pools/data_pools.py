@@ -424,6 +424,9 @@ class ScoreInformedTranscriptionPool(object):
             # get spectrogram excerpt (target note in center)
             excerpt, midi_excerpt = self.prepare_train_audio(i_sheet, i_spec, i_onset)
 
+            if midi_excerpt.shape != midi_batch.shape[-2:]:
+                raise ValueError('Wrong shape of MIDI excerpt: key {0}'.format(key))
+
             # collect batch data
             sheet_batch[i_entity, 0, :, :] = snippet
             spec_batch[i_entity, 0, :, :] = excerpt
