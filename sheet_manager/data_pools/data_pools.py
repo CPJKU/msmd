@@ -393,6 +393,11 @@ class ScoreInformedTranscriptionPool(object):
         excerpt = spec[:, start:stop]
         midi_excerpt = midi_matrix[:, start:stop]
 
+        if midi_excerpt.shape[-1] != self.spec_context:
+            raise ValueError('MIDI excerpt is not large enough for the spec. context! Excerpt shape: {0},'
+                             ' midi matrix shape: {1}, spectrogram shape: {2}, idx: {3}'
+                             ''.format(midi_excerpt.shape, midi_matrix.shape, spec.shape, i_sheet))
+
         if self.data_augmentation['spec_padding']:
             spec_padding = self.data_augmentation['spec_padding']
             excerpt = np.pad(excerpt, ((spec_padding, spec_padding), (0, 0)), mode='edge')
