@@ -649,8 +649,9 @@ def prepare_piece_data(collection_dir, piece_name, aug_config=NO_AUGMENT, requir
             midi = performance.load_midi_matrix()
 
             if midi.shape[1] != spec.shape[1]:
-                print('Perf {0}: Midi matrix and spectrogram have a different number of frames: MM {1}, spec {2}'
-                      ''.format(performance_key, midi.shape[1], spec.shape[1]))
+                logging.debug('Perf {0}: Midi matrix and spectrogram have'
+                              ' a different number of frames: MM {1}, spec {2}'
+                              ''.format(performance_key, midi.shape[1], spec.shape[1]))
                 n_frames = min(midi.shape[1], spec.shape[1])
                 midi = midi[:, :n_frames]
                 spec = spec[:, :n_frames]
