@@ -174,7 +174,7 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
                                                  data_augmentation=augment, shuffle=True)
         print("Train: %d" % tr_pool.shape[0])
 
-        va_images, va_specs, va_o2c_maps, va_midis = load_piece_list_midi(split['valid'], aug_config=no_augment, data_root=data_root)
+        va_images, va_specs, va_o2c_maps, va_midis = load_piece_list_midi(split['valid'], aug_config=va_augment, data_root=data_root)
         va_pool = ScoreInformedTranscriptionPool(va_images, va_specs, va_o2c_maps, va_midis,
                                                  spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
                                                  data_augmentation=va_augment, shuffle=False)
