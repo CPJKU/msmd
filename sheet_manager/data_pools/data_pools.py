@@ -648,6 +648,10 @@ def prepare_piece_data(collection_dir, piece_name, aug_config=NO_AUGMENT, requir
 
         if load_midi_matrix:
             midi = performance.load_midi_matrix()
+
+            if midi.shape[1] != spec.shape[1]:
+                raise ValueError('Perf {0}: Midi matrix and spectrogram have a different number of frames: MM {1}, spec {2}'
+                                 ''.format(performance_key, midi.shape[1], spec.shape[1]))
             midi_matrices.append(midi)
 
     if load_midi_matrix:
