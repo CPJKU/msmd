@@ -162,7 +162,6 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
     split = load_split(split_file)
 
     # initialize data pools
-    tr_pool, va_pool = None, None
     if not test_only:
         tr_images, tr_specs, tr_o2c_maps, tr_midis = load_piece_list_midi(split['train'], aug_config=augment, data_root=data_root)
         tr_pool = ScoreInformedTranscriptionPool(tr_images, tr_specs, tr_o2c_maps, tr_midis,
