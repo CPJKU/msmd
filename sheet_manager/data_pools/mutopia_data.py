@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 from sheet_manager.DEFAULT_CONFIG import DATA_ROOT_MSMD
 from sheet_manager.data_pools.data_pools import prepare_piece_data, AudioScoreRetrievalPool, AUGMENT, NO_AUGMENT
-from sheet_manager.data_pools.data_pools import SPEC_CONTEXT, SHEET_CONTEXT, SYSTEM_HEIGHT
+from sheet_manager.data_pools.data_pools import SPEC_CONTEXT, SHEET_CONTEXT_LEFT, SHEET_CONTEXT_RIGHT, SYSTEM_HEIGHT
 
 from data_pools import ScoreInformedTranscriptionPool
 
@@ -140,9 +140,12 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
     """
 
     if not config_file:
-        spec_context = SPEC_CONTEXT
-        sheet_context = SHEET_CONTEXT
         staff_height = SYSTEM_HEIGHT
+        sheet_context_left = SHEET_CONTEXT_LEFT
+        sheet_context_right = SHEET_CONTEXT_RIGHT
+        sheet_context = sheet_context_left + sheet_context_right
+
+        spec_context = SPEC_CONTEXT
         augment = AUGMENT
         no_augment = NO_AUGMENT
         va_augment = NO_AUGMENT.copy()
@@ -154,7 +157,15 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
             config["VA_AUGMENT"] = config["AUGMENT"]
 
         spec_context = config["SPEC_CONTEXT"]
-        sheet_context = config["SHEET_CONTEXT"]
+
+        if "SHEET_CONTEXT_LEFT" in config:
+            sheet_context_left = config["SHEET_CONTEXT_LEFT"]
+            sheet_context_right = config["SHEET_CONTEXT_RIGHT"]
+            sheet_context = sheet_context_left + sheet_context_right
+        else:
+            sheet_context = config["SHEET_CONTEXT"]
+            sheet_context_left = sheet_context // 2
+            sheet_context_right = sheet_context - sheet_context_left
         staff_height = config["SYSTEM_HEIGHT"]
         augment = config["AUGMENT"]
         no_augment = NO_AUGMENT
@@ -168,15 +179,25 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
 
     # initialize data pools
     if not test_only:
-        tr_images, tr_specs, tr_o2c_maps, tr_midis = load_piece_list_midi(split['train'], aug_config=augment, data_root=data_root)
+        tr_images, tr_specs, tr_o2c_maps, tr_midis = load_piece_list_midi(split['train'],
+                                                                          aug_config=augment,
+                                                                          data_root=data_root)
         tr_pool = ScoreInformedTranscriptionPool(tr_images, tr_specs, tr_o2c_maps, tr_midis,
-                                                 spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
+                                                 spec_context=spec_context,
+                                                 sheet_context_left=sheet_context_left,
+                                                 sheet_context_right=sheet_context_right,
+                                                 staff_height=staff_height,
                                                  data_augmentation=augment, shuffle=True)
         print("Train: %d" % tr_pool.shape[0])
 
-        va_images, va_specs, va_o2c_maps, va_midis = load_piece_list_midi(split['valid'], aug_config=va_augment, data_root=data_root)
+        va_images, va_specs, va_o2c_maps, va_midis = load_piece_list_midi(split['valid'],
+                                                                          aug_config=va_augment,
+                                                                          data_root=data_root)
         va_pool = ScoreInformedTranscriptionPool(va_images, va_specs, va_o2c_maps, va_midis,
-                                                 spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
+                                                 spec_context=spec_context,
+                                                 sheet_context_left=sheet_context_left,
+                                                 sheet_context_right=sheet_context_right,
+                                                 staff_height=staff_height,
                                                  data_augmentation=va_augment, shuffle=False)
         va_pool.reset_batch_generator()
         print("Valid: %d" % va_pool.shape[0])
