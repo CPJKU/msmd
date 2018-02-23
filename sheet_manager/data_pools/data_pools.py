@@ -17,7 +17,7 @@ from sheet_manager.alignments import align_score_to_performance
 
 # Note that sheet context is applied to *both* sides.
 # SHEET_CONTEXT = 200
-SHEET_CONTEXT_LEFT = 100
+SHEET_CONTEXT_LEFT = 120
 SHEET_CONTEXT_RIGHT = 20
 SHEET_CONTEXT = SHEET_CONTEXT_LEFT + SHEET_CONTEXT_RIGHT
 
@@ -254,7 +254,6 @@ class ScoreInformedTranscriptionPool(object):
 
         self.sheet_context_left = sheet_context_left
         self.sheet_context_right = sheet_context_right
-
         self.sheet_context = sheet_context_left + sheet_context_right
         self.staff_height = staff_height
 

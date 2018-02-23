@@ -86,7 +86,7 @@ def load_audio_score_retrieval(split_file, config_file=None, test_only=False):
 
     if not config_file:
         spec_context = SPEC_CONTEXT
-        sheet_context = SHEET_CONTEXT
+        sheet_context = SHEET_CONTEXT_LEFT + SHEET_CONTEXT_RIGHT
         staff_height = SYSTEM_HEIGHT
         augment = AUGMENT
         no_augment = NO_AUGMENT
@@ -209,7 +209,10 @@ def load_score_informed_transcription(split_file, config_file=None, test_only=Fa
     if not no_test:
         te_images, te_specs, te_o2c_maps, te_midis = load_piece_list_midi(split['test'], aug_config=test_augment, data_root=data_root)
         te_pool = ScoreInformedTranscriptionPool(te_images, te_specs, te_o2c_maps, te_midis,
-                                                 spec_context=spec_context, sheet_context=sheet_context, staff_height=staff_height,
+                                                 spec_context=spec_context,
+                                                 sheet_context_left=sheet_context_left,
+                                                 sheet_context_right=sheet_context_right,
+                                                 staff_height=staff_height,
                                                  data_augmentation=no_augment, shuffle=False)
         print("Test: %d" % te_pool.shape[0])
 
