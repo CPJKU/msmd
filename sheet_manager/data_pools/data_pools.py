@@ -15,8 +15,14 @@ from sheet_manager.data_model.piece import Piece
 from sheet_manager.alignments import align_score_to_performance
 
 
-SHEET_CONTEXT = 200
+# Note that sheet context is applied to *both* sides.
+# SHEET_CONTEXT = 200
+SHEET_CONTEXT_LEFT = 100
+SHEET_CONTEXT_RIGHT = 20
+SHEET_CONTEXT = SHEET_CONTEXT_LEFT + SHEET_CONTEXT_RIGHT
+
 SYSTEM_HEIGHT = 160
+
 SPEC_CONTEXT = 42
 SPEC_BINS = 92
 
@@ -233,7 +239,10 @@ class AudioScoreRetrievalPool(object):
 class ScoreInformedTranscriptionPool(object):
 
     def __init__(self, images, specs, o2c_maps, midi_matrices,
-                 spec_context=SPEC_CONTEXT, sheet_context=SHEET_CONTEXT, staff_height=SYSTEM_HEIGHT,
+                 spec_context=SPEC_CONTEXT,
+                 sheet_context_left=SHEET_CONTEXT_LEFT,
+                 sheet_context_right=SHEET_CONTEXT_RIGHT,
+                 staff_height=SYSTEM_HEIGHT,
                  data_augmentation=None, shuffle=True):
 
         self.images = images
@@ -242,7 +251,11 @@ class ScoreInformedTranscriptionPool(object):
         self.midi_matrices = midi_matrices
 
         self.spec_context = spec_context
-        self.sheet_context = sheet_context
+
+        self.sheet_context_left = sheet_context_left
+        self.sheet_context_right = sheet_context_right
+
+        self.sheet_context = sheet_context_left + sheet_context_right
         self.staff_height = staff_height
 
         self.data_augmentation = data_augmentation
@@ -331,8 +344,8 @@ class ScoreInformedTranscriptionPool(object):
         target_coord = self.o2c_maps[i_sheet][i_spec][i_onset][1]
 
         # get sub-image (with coordinate fixing)
-        c0 = max(0, target_coord - 2 * self.sheet_context)
-        c1 = min(c0 + 4 * self.sheet_context, sheet.shape[1])
+        c0 = max(0, target_coord - 2 * self.sheet_context_left)
+        c1 = min(c0 + 2 * self.sheet_context_left + 2 * self.sheet_context_right, sheet.shape[1])
         c0 = max(0, c1 - 4 * self.sheet_context)
         sheet = sheet[:, c0:c1]
 
@@ -344,10 +357,12 @@ class ScoreInformedTranscriptionPool(object):
             sheet = cv2.resize(sheet, new_size, interpolation=cv2.INTER_NEAREST)
 
         # target coordinate
-        x = sheet.shape[1] // 2
+        # ...due to scaling, we have to base this on the ratio between
+        #    between the sheet left context and right context.
+        x = int(sheet.shape[1] * (self.sheet_context_left / self.sheet_context))
 
         # compute sliding window coordinates
-        x0 = np.max([x - self.sheet_context // 2, 0])
+        x0 = np.max([x - self.sheet_context_left, 0])
         x1 = x0 + self.sheet_context
 
         x1 = int(np.min([x1, sheet.shape[1] - 1]))
