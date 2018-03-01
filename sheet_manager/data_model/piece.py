@@ -167,6 +167,11 @@ class Piece(MSMDMetadataMixin):
                                   require_midi=False, require_audio=False)
         return p.length_in_seconds()
 
+    @property
+    def n_pages(self):
+        score = self.load_score(self.scores.keys()[0])
+        return score.n_pages
+
     def _ensure_piece_structure(self):
         """Creates the basic expected directory structure."""
         if not os.path.isdir(self.performance_dir):

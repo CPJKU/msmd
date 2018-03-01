@@ -96,6 +96,7 @@ class MSMD(object):
 
                     # Compute seconds
                     stats['seconds'] = piece.seconds
+                    stats['n_pages'] = piece.n_pages
 
                     all_piece_stats.append(stats)
 
