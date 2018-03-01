@@ -50,7 +50,7 @@ class MSMD(object):
                 continue
 
             if composers is not None:
-                if p.composer not in composers:
+                if Piece.composer_name_from_piece_name(p) not in composers:
                     continue
 
             pieces[p] = piece_dir
