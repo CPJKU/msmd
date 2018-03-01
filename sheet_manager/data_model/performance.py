@@ -264,6 +264,17 @@ class Performance(MSMDMetadataMixin):
     #         metadata = yaml.load_all(hdl)
     #
     #     return metadata
+    def length_in_seconds(self, FPS=20.0, FIXED_END_LENGTH=2):
+        """Computes the length of the performance in seconds.
+        Note that it computes this length from the last onset and adds two
+        seconds. This is much faster than loading the entire MIDI matrix
+        or spectrogram.
+        """
+        onsets = self.load_onsets()
+        last_onset = onsets[-1]
+        last_onset_seconds = last_onset / FPS
+        total_seconds = last_onset_seconds + FIXED_END_LENGTH
+        return total_seconds
 
     def load_feature(self, feature_name):
         """Loads the feature with the given name, if available
