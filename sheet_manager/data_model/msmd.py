@@ -30,16 +30,30 @@ class MSMD(object):
     def update(self):
         self.pieces = self.collect_pieces()
 
-    def collect_pieces(self):
+    def collect_pieces(self, composers=None):
         """Collects a dict of the available pieces. Keys
         are piece names (corresponding to directory naes
         in the ``self.folder`` directory), values are the paths
-        of the pieces."""
+        of the pieces.
+
+        :param composers: A list of composer names according to Mutopia
+            (so, e.g., ``['BachCPE', 'Schumann']``). If given, will
+            only collect pieces by these composers.
+        """
         pieces = collections.OrderedDict()
+        if composers is not None:
+            composers = set(composers)
         for p in sorted(os.listdir(self.folder)):
             piece_dir = os.path.join(self.folder, p)
-            if os.path.isdir(piece_dir):
-                pieces[p] = piece_dir
+
+            if not os.path.isdir(piece_dir):
+                continue
+
+            if composers is not None:
+                if p.composer not in composers:
+                    continue
+
+            pieces[p] = piece_dir
 
         return pieces
 

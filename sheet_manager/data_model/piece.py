@@ -137,6 +137,17 @@ class Piece(MSMDMetadataMixin):
         # Alias for the MSMDMetadataMixin
         return self.folder
 
+    @property
+    def composer(self):
+        return self.composer_name_from_piece_name(self.name)
+
+    @staticmethod
+    def composer_name_from_piece_name(piece_name):
+        """Based on the piece name, extracts the composer name."""
+        separator = '__'
+        composer = piece_name.split(separator)[0]
+        return composer
+
     def _ensure_piece_structure(self):
         """Creates the basic expected directory structure."""
         if not os.path.isdir(self.performance_dir):
