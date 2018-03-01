@@ -148,6 +148,25 @@ class Piece(MSMDMetadataMixin):
         composer = piece_name.split(separator)[0]
         return composer
 
+    @property
+    def seconds(self):
+        """How many seconds does this piece take by default?"""
+        # Select performance with natural tempo
+        nat_perf = None
+        for perf in self.available_performances:
+            if '1000' in perf:
+                nat_perf = perf
+                break
+
+        if nat_perf is None:
+            raise ValueError('Cannot yet compute # seconds from non-natural'
+                             ' performance.')
+
+        # Return its length
+        p = self.load_performance(nat_perf,
+                                  require_midi=False, require_audio=False)
+        return p.length_in_seconds()
+
     def _ensure_piece_structure(self):
         """Creates the basic expected directory structure."""
         if not os.path.isdir(self.performance_dir):

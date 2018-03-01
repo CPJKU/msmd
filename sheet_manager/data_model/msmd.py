@@ -93,7 +93,12 @@ class MSMD(object):
                         continue
 
                     stats = piece.metadata[_metadata_stats_key]
+
+                    # Compute seconds
+                    stats['seconds'] = piece.seconds
+
                     all_piece_stats.append(stats)
+
 
         aggregate = reduce_dicts(all_piece_stats, fn=sum)
         # average = average_dicts(all_piece_stats)
