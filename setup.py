@@ -4,11 +4,11 @@ from __future__ import print_function, unicode_literals, division
 from setuptools import setup
 
 setup(
-    name='sheet_manager',
+    name='msmd',
     version='0.1',
-    packages=['sheet_manager',
-              'sheet_manager.gui',
-              'sheet_manager.data_model'],
+    packages=['msmd',
+              'msmd.gui',
+              'msmd.data_model'],
     include_package_data=True,
     url='',
     license='(c) All rights reserved.',
