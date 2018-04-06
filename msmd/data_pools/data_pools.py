@@ -9,10 +9,10 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 
 
-from sheet_manager.midi_parser import notes_to_onsets, FPS
+from msmd.midi_parser import notes_to_onsets, FPS
 
-from sheet_manager.data_model.piece import Piece
-from sheet_manager.alignments import align_score_to_performance
+from msmd.data_model.piece import Piece
+from msmd.alignments import align_score_to_performance
 
 
 # Note that sheet context is applied to *both* sides.

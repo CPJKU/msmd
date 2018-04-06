@@ -8,7 +8,7 @@ import os
 import numpy
 import yaml
 
-from sheet_manager.data_model.util import SheetManagerDBError, path2name, MSMDMetadataMixin
+from msmd.data_model.util import SheetManagerDBError, path2name, MSMDMetadataMixin
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."

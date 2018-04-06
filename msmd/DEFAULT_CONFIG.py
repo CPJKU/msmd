@@ -83,7 +83,7 @@ except ImportError:
     # -----------
 
     OMR_RELATIVE_DIR = 'omr_models'
-    #: Path of the OMR model params dir relative to the sheet_manager.py file.
+    #: Path of the OMR model params dir relative to the msmd.py file.
 
     # OMR_ABSOLUTE_DIR = None
     #: Absolute path of the OMR models dir. Overrides OMR_RELATIVE_DIR;

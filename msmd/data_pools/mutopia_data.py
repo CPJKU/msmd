@@ -6,9 +6,9 @@ import sys
 import yaml
 from tqdm import tqdm
 
-from sheet_manager.DEFAULT_CONFIG import DATA_ROOT_MSMD
-from sheet_manager.data_pools.data_pools import prepare_piece_data, AudioScoreRetrievalPool, AUGMENT, NO_AUGMENT
-from sheet_manager.data_pools.data_pools import SPEC_CONTEXT, SHEET_CONTEXT_LEFT, SHEET_CONTEXT_RIGHT, SYSTEM_HEIGHT
+from msmd.DEFAULT_CONFIG import DATA_ROOT_MSMD
+from msmd.data_pools.data_pools import prepare_piece_data, AudioScoreRetrievalPool, AUGMENT, NO_AUGMENT
+from msmd.data_pools.data_pools import SPEC_CONTEXT, SHEET_CONTEXT_LEFT, SHEET_CONTEXT_RIGHT, SYSTEM_HEIGHT
 
 from data_pools import ScoreInformedTranscriptionPool
 
@@ -230,7 +230,7 @@ if __name__ == "__main__":
     #     batch_iterator = MultiviewPoolIteratorUnsupervised(batch_size=batch_size, prepare=prepare, k_samples=None)
     #     return batch_iterator
     #
-    # data = load_audio_score_retrieval(split_file="/home/matthias/cp/src/sheet_manager/sheet_manager/splits/bach_split.yaml",
+    # data = load_audio_score_retrieval(split_file="/home/matthias/cp/src/msmd/msmd/splits/bach_split.yaml",
     #                                   config_file="/home/matthias/cp/src/audio_sheet_retrieval/audio_sheet_retrieval/exp_configs/mutopia_no_aug.yaml",
     #                                   test_only=True)
     #
@@ -287,7 +287,7 @@ if __name__ == "__main__":
 
     def train_batch_iterator(batch_size=1):
         """ Compile batch iterator """
-        from sheet_manager.data_pools.batch_iterators import TripleviewPoolIteratorUnsupervised
+        from msmd.data_pools.batch_iterators import TripleviewPoolIteratorUnsupervised
         batch_iterator = TripleviewPoolIteratorUnsupervised(batch_size=batch_size, prepare=prepare, k_samples=None)
         return batch_iterator
 

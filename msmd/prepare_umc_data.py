@@ -252,7 +252,7 @@ if __name__ == '__main__':
         # count annotated notes
         note_count_annotated += np.sum([len(v) for v in page_note_coords.itervalues()])
 
-        # dump sheet_manager compatible folder
+        # dump msmd compatible folder
         piece_folder_name = piece_name.replace(".", "").replace(",", "").replace(" ", "_").replace("-", "_")
         piece_folder_name = re.sub("_+", "_", piece_folder_name)
         piece_folder = os.path.join(DST_DIR, piece_folder_name)

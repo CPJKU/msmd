@@ -11,7 +11,7 @@ if __name__ == "__main__":
     """ main """
 
     collection_dir = '/media/matthias/Data/msmd/'
-    piece_file = "/home/matthias/cp/src/sheet_manager/sheet_manager/splits/all_pieces.yaml"
+    piece_file = "/home/matthias/cp/src/msmd/msmd/splits/all_pieces.yaml"
     count_file = piece_file.replace(".yaml", "_counts.yaml")
 
     # compute note counts for piece list

@@ -14,7 +14,7 @@ from muscima.graph import NotationGraph
 from muscima.inference_engine_constants import InferenceEngineConstants
 from muscima.io import parse_cropobject_list
 
-from sheet_manager.data_model.util import SheetManagerDBError, path2name, MSMDMetadataMixin
+from msmd.data_model.util import SheetManagerDBError, path2name, MSMDMetadataMixin
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."

@@ -6,7 +6,7 @@ if __name__ == "__main__":
     """ main """
 
     collection_dir = '/media/matthias/Data/msmd/'
-    piece_file = "/home/matthias/cp/src/sheet_manager/sheet_manager/splits/all_pieces_aug.yaml"
+    piece_file = "/home/matthias/cp/src/msmd/msmd/splits/all_pieces_aug.yaml"
 
     with open(piece_file, 'rb') as hdl:
         pieces = yaml.load(hdl)

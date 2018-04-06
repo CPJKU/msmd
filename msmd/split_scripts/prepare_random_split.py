@@ -8,10 +8,10 @@ import numpy as np
 if __name__ == "__main__":
     """ main """
 
-    piece_file = "/home/matthias/cp/src/sheet_manager/sheet_manager/splits/bach_pieces.yaml"
+    piece_file = "/home/matthias/cp/src/msmd/msmd/splits/bach_pieces.yaml"
     count_file = piece_file.replace(".yaml", "_counts.yaml")
 
-    split_file = "/home/matthias/cp/src/sheet_manager/sheet_manager/splits/bach_split.yaml"
+    split_file = "/home/matthias/cp/src/msmd/msmd/splits/bach_split.yaml"
 
     # load note counts
     with open(count_file, 'rb') as hdl:

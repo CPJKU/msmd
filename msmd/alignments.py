@@ -27,9 +27,9 @@ import numpy
 from muscima.cropobject import cropobjects_merge_bbox, CropObject, link_cropobjects
 from skimage.measure import regionprops
 
-from sheet_manager.data_model.score import group_mungos_by_column
-from sheet_manager.midi_parser import notes_to_onsets, FPS
-from sheet_manager.utils import greater_than_zero_intervals
+from msmd.data_model.score import group_mungos_by_column
+from msmd.midi_parser import notes_to_onsets, FPS
+from msmd.utils import greater_than_zero_intervals
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."

@@ -29,7 +29,7 @@ a spectrogram, an onset map, and a MIDI matrix.
 
 Further details are in the documentation.
 
-The ``sheet_manager.py`` can be called either for batch processing as a script,
+The ``msmd.py`` can be called either for batch processing as a script,
 or a GUI for manually validating the annotations, especially alignment between
 noteheads and onsets.
 """
@@ -56,16 +56,16 @@ import numpy as np
 # set backend to qt
 import matplotlib
 from muscima.io import export_cropobject_list, parse_cropobject_list
-from sheet_manager.alignments import group_mungos_by_system, \
+from msmd.alignments import group_mungos_by_system, \
     group_mungos_by_system_paths, \
     build_system_mungos_on_page, \
     align_score_to_performance, \
     alignment_stats, \
     is_aln_problem, \
     detect_system_regions_ly
-from sheet_manager.ly_parser import mung_midi_from_ly_links
-from sheet_manager.data_model.piece import Piece
-from sheet_manager.data_model.util import SheetManagerDBError
+from msmd.ly_parser import mung_midi_from_ly_links
+from msmd.data_model.piece import Piece
+from msmd.data_model.util import SheetManagerDBError
 
 # matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt

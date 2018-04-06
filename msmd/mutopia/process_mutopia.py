@@ -20,7 +20,7 @@ import pickle
 import re
 import time
 
-from sheet_manager.mutopia.parsing import PIANO_LIKE_INSTRUMENTS, is_include, parse_include_link, load_ly_lines, \
+from msmd.mutopia.parsing import PIANO_LIKE_INSTRUMENTS, is_include, parse_include_link, load_ly_lines, \
     MutopiaCorpus
 
 __version__ = "0.0.1"
