@@ -312,6 +312,6 @@ to ease loading MSMD from Python scripts.
 
 If you want to explore how MSMD was generated, refer to:
 
-  sheet_manager_app.py:SheetManager.process_piece()
+  sheet_manager_app.py:MSMDManager.process_piece()
 
 The process is described in Appendix A of [1].

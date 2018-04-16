@@ -65,7 +65,7 @@ from msmd.alignments import group_mungos_by_system, \
     detect_system_regions_ly
 from msmd.ly_parser import mung_midi_from_ly_links
 from msmd.data_model.piece import Piece
-from msmd.data_model.util import SheetManagerDBError
+from msmd.data_model.util import MSMDDBError
 
 # matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
@@ -92,11 +92,11 @@ tempo_ratios = [0.9, 0.95, 1.0, 1.05, 1.1]
 sound_fonts = ["acoustic_piano_imis_1", "ElectricPiano", "YamahaGrandPiano"]
 
 
-class SheetManagerError(Exception):
+class MSMDManagerError(Exception):
     pass
 
 
-class SheetManagerGui(QtGui.QMainWindow, form_class):
+class MSMDManagerGui(QtGui.QMainWindow, form_class):
 
     def __init__(self, parent):
         QtGui.QMainWindow.__init__(self, parent)
@@ -164,7 +164,7 @@ class SheetManagerGui(QtGui.QMainWindow, form_class):
         mgr.window_bottom = self.spinBox_window_bottom.value()
 
 
-class SheetManager(object):
+class MSMDManager(object):
     """Processing and GUI for the Multi-Modal MIR dataset.
 
     The workflow is wrapped in the ``process_piece()`` method.
@@ -242,15 +242,15 @@ class SheetManager(object):
         self.interactive = interactive
 
         if self.interactive:
-            print('SheetManager: running in INTERACTIVE mode')
-            self.gui = SheetManagerGui(parent=parent)
+            print('MSMDManager: running in INTERACTIVE mode')
+            self.gui = MSMDManagerGui(parent=parent)
             self.gui.setup_bindings(self)
         else:
             self.gui = None
-            print('SheetManager: running in BATCH mode')
+            print('MSMDManager: running in BATCH mode')
 
     def reset(self):
-        """Resets the SheetManager back to its initial state."""
+        """Resets the MSMDManager back to its initial state."""
         self.piece = None
         self.current_score = None
         self.current_performance = None
@@ -302,19 +302,19 @@ class SheetManager(object):
         """Process the entire piece, using the specified workflow.
 
         :param piece_folder: The path of the requested piece folder.
-            If the piece folder is not found, raises a ``SheetManagerError``.
+            If the piece folder is not found, raises a ``MSMDManagerError``.
 
         :param workflow: Which workflow to use, based on the available encoding
             of the piece. By default, uses ``"ly"``, the LilyPond workflow.
             (Currently, only the LilyPond workflow is implemented.)
         """
         if not os.path.isdir(piece_folder):
-            raise SheetManagerError('Piece folder not found: {0}'
+            raise MSMDManagerError('Piece folder not found: {0}'
                                     ''.format(piece_folder))
 
         is_workflow_ly = (workflow == "ly") or (workflow == "Ly")
         if not is_workflow_ly:
-            raise SheetManagerError('Only the LilyPond workflow is currently '
+            raise MSMDManagerError('Only the LilyPond workflow is currently '
                                     ' supported!'
                                     ' Use arguments workflow="ly" or "Ly". '
                                     ' (Got: workflow="{0}")'.format(workflow))
@@ -324,7 +324,7 @@ class SheetManager(object):
         self.load_piece(piece_folder)
 
         if is_workflow_ly and not self.lily_file:
-            raise SheetManagerError('Piece does not have LilyPond source'
+            raise MSMDManagerError('Piece does not have LilyPond source'
                                     ' available; cannot process with workflow={0}'
                                     ''.format(workflow))
 
@@ -391,7 +391,7 @@ class SheetManager(object):
         self.reset()
 
         if not os.path.isdir(piece_folder):
-            raise SheetManagerError('Piece folder not found: {0}'
+            raise MSMDManagerError('Piece folder not found: {0}'
                                     ''.format(piece_folder))
         self.load_piece(piece_folder)
         self.load_performance_features()
@@ -459,7 +459,7 @@ class SheetManager(object):
 
     # r-x GUI
     def load_piece(self, folder_name):
-        """Given a piece folder, set the current state of SheetManager to this piece.
+        """Given a piece folder, set the current state of MSMDManager to this piece.
         If the folder does not exist, does nothing."""
         if not os.path.isdir(folder_name):
             print('Loading piece from folder {0} failed: folder does not exist!'
@@ -511,7 +511,7 @@ class SheetManager(object):
 
     # r-- GUI
     def update_current_score(self):
-        """Reacts to a change in the score that SheetManager is supposed
+        """Reacts to a change in the score that MSMDManager is supposed
         to be currently processing."""
         score_name = str(self.gui.comboBox_score.currentText())
         self.set_current_score(score_name)
@@ -525,7 +525,7 @@ class SheetManager(object):
 
         try:
             current_score = self.piece.load_score(score_name)
-        except SheetManagerDBError as e:
+        except MSMDDBError as e:
             print('Could not load score {0}: malformed?'
                   ' Error message: {1}'.format(score_name, e.message))
             return
@@ -552,7 +552,7 @@ class SheetManager(object):
             current_performance = self.piece.load_performance(perf_name,
                                                               require_audio=False,
                                                               require_midi=True)
-        except SheetManagerDBError as e:
+        except MSMDDBError as e:
             print('Could not load performance {0}: malformed?'
                   ' Error message: {1}'.format(perf_name, e.message))
             return
@@ -963,7 +963,7 @@ class SheetManager(object):
         # self.status_label.setText("Rendering audio ...")
 
         if 'midi' not in self.piece.encodings:
-            raise SheetManagerError('Cannot render audio from current piece:'
+            raise MSMDManagerError('Cannot render audio from current piece:'
                                     ' no MIDI encoding available!')
 
         from render_audio import render_audio
@@ -1118,7 +1118,7 @@ class SheetManager(object):
 
         try:
             midi_matrix = self.current_performance.load_midi_matrix()
-        except SheetManagerDBError as e:
+        except MSMDDBError as e:
             logging.warning('Loading midi matrix from current performance {0}'
                             ' failed: {1}'.format(self.current_performance.name,
                                                   e.message))
@@ -1127,7 +1127,7 @@ class SheetManager(object):
 
         try:
             onsets = self.current_performance.load_onsets()
-        except SheetManagerDBError as e:
+        except MSMDDBError as e:
             logging.warning('Loading onsets from current performance {0}'
                             ' failed: {1}'.format(self.current_performance.name,
                                                   e.message))
@@ -1136,7 +1136,7 @@ class SheetManager(object):
 
         try:
             spectrogram = self.current_performance.load_spectrogram()
-        except SheetManagerDBError as e:
+        except MSMDDBError as e:
             logging.warning('Loading spectrogram from current performance {0}'
                             ' failed: {1}'.format(self.current_performance.name,
                                                   e.message))
@@ -1145,7 +1145,7 @@ class SheetManager(object):
 
         try:
             notes = self.current_performance.load_note_events()
-        except SheetManagerDBError as e:
+        except MSMDDBError as e:
             logging.warning('Loading note events from current performance {0}'
                             ' failed: {1}'.format(self.current_performance.name,
                                                   e.message))
@@ -1601,7 +1601,7 @@ class SheetManager(object):
                     try:
                         onset = self._mungo_onset_frame_for_current_performance(m)
                         _aln_onset, _aln_pitch = self._aligned_onset_and_pitch(m)
-                    except SheetManagerError:
+                    except MSMDManagerError:
                         if ('tied' in m.data) and (m.data['tied'] == 1):
                             aln_tied_m_centroids.append(mc)
                         else:
@@ -1796,7 +1796,7 @@ class SheetManager(object):
                     plt.title("MuNG {0} (p: {1})"
                               "".format(mungo.objid,
                                         mungo.data['midi_pitch_code']))
-                except SheetManagerError:
+                except MSMDManagerError:
                     mung_onset_successful = False
             else:
                 mung_onset_successful = False
@@ -2177,7 +2177,7 @@ class SheetManager(object):
         perf_attr_string = '{0}_onset_frame' \
                            ''.format(self.current_performance.name)
         if perf_attr_string not in mungo.data:
-            raise SheetManagerError('Cannot get onset frame from MuNG'
+            raise MSMDManagerError('Cannot get onset frame from MuNG'
                                     ' object {0}: data attribute {1} is'
                                     ' missing!'.format(mungo.objid,
                                                        perf_attr_string))
@@ -2283,7 +2283,7 @@ def launch_gui(args):
         logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
     app = QtGui.QApplication(sys.argv)
-    myWindow = SheetManager(interactive=True)
+    myWindow = MSMDManager(interactive=True)
     if args.data_dir:
         if len(args.pieces) > 0:
             piece = args.pieces[0]
@@ -2294,7 +2294,7 @@ def launch_gui(args):
 
 
 def run_batch_mode(args):
-    """Runs SheetManager in batch mode."""
+    """Runs MSMDManager in batch mode."""
     data_dir = args.data_dir
     if not os.path.isdir(data_dir):
         raise OSError('Requested data dir does not exist: {0}'
@@ -2328,7 +2328,7 @@ def run_batch_mode(args):
 
     # We need to initialize the app to give PyQT all the context it expects
     # app = QtGui.QApplication(sys.argv, False)
-    mgr = SheetManager(interactive=False)
+    mgr = MSMDManager(interactive=False)
     # Does not do mgr.show()!
     # app.exec_()
 

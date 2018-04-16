@@ -8,7 +8,7 @@ import os
 import numpy
 import yaml
 
-from msmd.data_model.util import SheetManagerDBError, path2name, MSMDMetadataMixin
+from msmd.data_model.util import MSMDDBError, path2name, MSMDMetadataMixin
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
@@ -40,7 +40,7 @@ class Performance(MSMDMetadataMixin):
         super(Performance, self).__init__()
 
         if not os.path.isdir(folder):
-            raise SheetManagerDBError('Performance initialized with'
+            raise MSMDDBError('Performance initialized with'
                                       ' non-existent directory: {0}'
                                       ''.format(folder))
         self.folder = folder
@@ -197,7 +197,7 @@ class Performance(MSMDMetadataMixin):
 
         :param required: If no audio with the format specified for
             the Performance (by default: ``*.flac``) is discovered,
-            will raise a ``SheetManagerDBError``.
+            will raise a ``MSMDDBError``.
         """
         candidate_files = self._discover_candidate_files(self.audio_fmt)
         #
@@ -217,7 +217,7 @@ class Performance(MSMDMetadataMixin):
 
         if len(candidate_files) == 0:
             if required:
-                raise SheetManagerDBError('No audio with requested format {0}'
+                raise MSMDDBError('No audio with requested format {0}'
                                           ' found in performance {1}!'
                                           ''.format(self.audio_fmt, self.folder))
             else:
@@ -246,7 +246,7 @@ class Performance(MSMDMetadataMixin):
 
         if midi_fname is None:
             if required:
-                raise SheetManagerDBError('No MIDI found in performance {0}!'
+                raise MSMDDBError('No MIDI found in performance {0}!'
                                           ' All candidates: {1}'
                                           ''.format(self.folder, '\n'.join(all_candidates)))
 
@@ -287,7 +287,7 @@ class Performance(MSMDMetadataMixin):
                                        self.features.keys()))
 
         if not os.path.isfile(self.features[feature_name]):
-            raise SheetManagerDBError('Performance {0}: feature {1} is'
+            raise MSMDDBError('Performance {0}: feature {1} is'
                                       ' available, but the file {2} does not'
                                       ' exist...?'
                                       ''.format(self.name,
@@ -322,12 +322,12 @@ class Performance(MSMDMetadataMixin):
         candidate_feature_names = [f for f in self.features
                                    if f.endswith(suffix)]
         if len(candidate_feature_names) == 0:
-            raise SheetManagerDBError('Performance {0}: Feature {1}'
+            raise MSMDDBError('Performance {0}: Feature {1}'
                                       ' not available! Availble feature'
                                       ' names: {2}'.format(self.name, suffix,
                                                            self.features.keys()))
         if len(candidate_feature_names) > 1:
-            raise SheetManagerDBError('Performance {0}: More than one feature'
+            raise MSMDDBError('Performance {0}: More than one feature'
                                       ' conforms to the suffix {1}: {2}'
                                       ''.format(self.name, suffix,
                                                 candidate_feature_names))

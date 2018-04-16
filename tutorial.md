@@ -72,7 +72,7 @@ note event matrix, and spectrogram), and the alignment between MuNG objects
 and MIDI note events.
 
 Each piece in MSMD is processed separately using the `sheet_manager_app.py`
-and the `SheetManager` class therein. There is an interactive mode
+and the `MSMDManager` class therein. There is an interactive mode
 for visualizing results and debugging the extraction pipeline, and a batch
 mode for processing multiple pieces in one run.
 
@@ -110,10 +110,10 @@ Get directory names:
     piece_dir = os.path.join(collection_dir, piece_name)
 ```
 
-Initialize SheetManager:
+Initialize MSMDManager:
 
 ```
-    mgr = SheetManager(interactive=False)
+    mgr = MSMDManager(interactive=False)
 ```
 
 To load a piece, its score and performance (assuming at least one of each
@@ -191,7 +191,7 @@ given notehead:
 
 
 
-# Recording the alignment inside the MuNG objects: SheetManager.update_mung_alignment()
+# Recording the alignment inside the MuNG objects: MSMDManager.update_mung_alignment()
 # This stores the alignment persistently.
 onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
 m.data['{0}_onset_seconds'.format(performance.name)] = e[0]
@@ -220,8 +220,8 @@ img = images[m_page]
 from sheet_music.alignments import detect_system_regions_ly
 systems_as_corners = detect_system_regions_ly(img)
 
-# To update the MuNG staff objects, see SheetManager.detect_systems() method.
-# Then, persist the MuNGs back to the score: see SheetManager.save_mung()
+# To update the MuNG staff objects, see MSMDManager.detect_systems() method.
+# Then, persist the MuNGs back to the score: see MSMDManager.save_mung()
 
 
 

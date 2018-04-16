@@ -13,7 +13,7 @@ import yaml
 
 from msmd.data_model.performance import Performance
 from msmd.data_model.score import Score
-from msmd.data_model.util import SheetManagerDBError, MSMDMetadataMixin
+from msmd.data_model.util import MSMDDBError, MSMDMetadataMixin
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
@@ -84,12 +84,12 @@ class Piece(MSMDMetadataMixin):
         super(Piece, self).__init__()
 
         if not os.path.isdir(root):
-            raise SheetManagerDBError('Collection root directory does not'
+            raise MSMDDBError('Collection root directory does not'
                                       ' exist: {0}'.format(root))
 
         piece_folder = os.path.join(root, name)
         if not os.path.isdir(piece_folder):
-            raise SheetManagerDBError('Piece {0} in collection {1} does'
+            raise MSMDDBError('Piece {0} in collection {1} does'
                                       ' not exist'.format(name, root))
 
         if authority_format not in self.AVAILABLE_AUTHORITIES:
@@ -108,7 +108,7 @@ class Piece(MSMDMetadataMixin):
 
         self.encodings = self.collect_encodings()
         if authority_format not in self.encodings:
-            raise SheetManagerDBError('Piece {0} in collection {1} does'
+            raise MSMDDBError('Piece {0} in collection {1} does'
                                       ' not have the requested authority'
                                       ' encoding {2}. (Available encodings:'
                                       ' {3}'.format(self.name, root,
@@ -182,7 +182,7 @@ class Piece(MSMDMetadataMixin):
     def load_score(self, score_name):
         self.update()
         if score_name not in self.scores:
-            raise SheetManagerDBError('Piece {0} in collection {1} does'
+            raise MSMDDBError('Piece {0} in collection {1} does'
                                       ' not have a score with name {2}.'
                                       ' Available scores: {3}'
                                       ''.format(self.name, self.collection_root,
@@ -201,7 +201,7 @@ class Piece(MSMDMetadataMixin):
         and returns it. You can pass Performance initialization kwargs."""
         self.update()
         if performance_name not in self.performances:
-            raise SheetManagerDBError('Piece {0} in collection {1} does'
+            raise MSMDDBError('Piece {0} in collection {1} does'
                                       ' not have a performance with name {2}.'
                                       ' Available performances: {3}'
                                       ''.format(self.name, self.collection_root,
@@ -238,7 +238,7 @@ class Piece(MSMDMetadataMixin):
             raise ValueError('Authority format not supported: {0}'
                              ''.format(authority_format))
         if authority_format not in self.encodings:
-            raise SheetManagerDBError('Piece {0} in collection {1} does'
+            raise MSMDDBError('Piece {0} in collection {1} does'
                                       ' not have the requested authority'
                                       ' encoding {2}. (Available encodings:'
                                       ' {3}'.format(self.name,
@@ -269,7 +269,7 @@ class Piece(MSMDMetadataMixin):
         return scores
 
     def collect_encodings(self):
-        """Collects various encodings that SheetManager can deal with:
+        """Collects various encodings that MSMDManager can deal with:
 
         * MusicXML (*.xml)
         * LilyPond (*.ly)
@@ -395,7 +395,7 @@ class Piece(MSMDMetadataMixin):
                 time.sleep(5)
                 self.remove_performance(name)
             else:
-                raise SheetManagerDBError('Piece {0}: performance {1} already'
+                raise MSMDDBError('Piece {0}: performance {1} already'
                                           ' exists!'.format(self.name, name))
         new_performance_dir = os.path.join(self.performance_dir, name)
 
@@ -459,7 +459,7 @@ class Piece(MSMDMetadataMixin):
                 time.sleep(5)
                 self.remove_score(name)
             else:
-                raise SheetManagerDBError('Piece {0}: performance {1} already'
+                raise MSMDDBError('Piece {0}: performance {1} already'
                                           ' exists!'.format(self.name, name))
         new_score_dir = os.path.join(self.score_dir, name)
 

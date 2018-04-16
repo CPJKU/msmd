@@ -14,7 +14,7 @@ from muscima.graph import NotationGraph
 from muscima.inference_engine_constants import InferenceEngineConstants
 from muscima.io import parse_cropobject_list
 
-from msmd.data_model.util import SheetManagerDBError, path2name, MSMDMetadataMixin
+from msmd.data_model.util import MSMDDBError, path2name, MSMDMetadataMixin
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
@@ -46,7 +46,7 @@ class Score(MSMDMetadataMixin):
         super(Score, self).__init__()
 
         if not os.path.isdir(folder):
-            raise SheetManagerDBError('Score initialized with'
+            raise MSMDDBError('Score initialized with'
                                       ' non-existent directory: {0}'
                                       ''.format(folder))
         self.folder = folder
@@ -101,10 +101,10 @@ class Score(MSMDMetadataMixin):
         available_pdf_files = [f for f in os.listdir(self.folder)
                                if f.endswith('.pdf')]
         if len(available_pdf_files) == 0:
-            raise SheetManagerDBError('Instantiated a Score without the PDF'
+            raise MSMDDBError('Instantiated a Score without the PDF'
                                       ' authority document: {0}'.format(self.folder))
         if len(available_pdf_files) > 1:
-            raise SheetManagerDBError('Instantiated a Score with more than one PDF'
+            raise MSMDDBError('Instantiated a Score with more than one PDF'
                                       ' authority document: {0}'.format(self.folder))
         pdf_fname = available_pdf_files[0]
         pdf_file = os.path.join(self.folder, pdf_fname)
@@ -193,7 +193,7 @@ class Score(MSMDMetadataMixin):
         in the view."""
         self.update()
         if view_name not in self.views:
-            raise SheetManagerDBError('Score {0}: requested view {1}'
+            raise MSMDDBError('Score {0}: requested view {1}'
                                       ' not available!'
                                       ''.format(self.name, view_name))
         view_dir = self.views[view_name]
@@ -205,7 +205,7 @@ class Score(MSMDMetadataMixin):
         """Removes the given view."""
         self.update()
         if view_name not in self.views:
-            raise SheetManagerDBError('Score {0}: requested clearing view'
+            raise MSMDDBError('Score {0}: requested clearing view'
                                       ' {1}, but this view does not exist!'
                                       ' (Available views: {2})'
                                       ''.format(self.name, view_name,
@@ -244,7 +244,7 @@ class Score(MSMDMetadataMixin):
         sure the objids don't clash across pages!"""
         self.update()
         if 'mung' not in self.views:
-            raise SheetManagerDBError('Score {0}: mung view not available!'
+            raise MSMDDBError('Score {0}: mung view not available!'
                                       ''.format(self.name))
         mung_files = self.view_files('mung')
 
@@ -273,7 +273,7 @@ class Score(MSMDMetadataMixin):
         """
         self.update()
         if 'mung' not in self.views:
-            raise SheetManagerDBError('Score {0}: mung view not available!'
+            raise MSMDDBError('Score {0}: mung view not available!'
                                       ''.format(self.name))
         mung_files = self.view_files('mung')
 

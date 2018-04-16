@@ -11,7 +11,7 @@ __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
 
 
-class SheetManagerLyParsingError(Exception):
+class MSMDLyParsingError(Exception):
     pass
 
 
@@ -80,8 +80,8 @@ class LilyPondLinkPitchParser(object):
 
             try:
                 midi_pitch_code = self.ly_token_to_midi_pitch(token)
-            except SheetManagerLyParsingError as e:
-                raise SheetManagerLyParsingError('Token {0} at location {1}'
+            except MSMDLyParsingError as e:
+                raise MSMDLyParsingError('Token {0} at location {1}'
                                                  ' could not be parsed. Line:'
                                                  ' {2}'
                                                  ''.format(token, (row, col),
@@ -196,7 +196,7 @@ class LilyPondLinkPitchParser(object):
         for t in reversed(tokens):
             try:
                 LilyPondLinkPitchParser.ly_token_to_midi_pitch(t)
-            except SheetManagerLyParsingError:
+            except MSMDLyParsingError:
                 continue
             has_notes = True
             break
@@ -255,7 +255,7 @@ class LilyPondLinkPitchParser(object):
         try:
             LilyPondLinkPitchParser.ly_token_to_midi_pitch(ly_token)
             return True
-        except SheetManagerLyParsingError:
+        except MSMDLyParsingError:
             logging.debug('----- token {0} is not a note!'.format(ly_token))
             return False
 
@@ -275,9 +275,9 @@ class LilyPondLinkPitchParser(object):
                 try:
                     return LilyPondLinkPitchParser.ly_token_to_midi_pitch(ly_token_strict)
                 except Exception as e:
-                    raise SheetManagerLyParsingError(e.message)
+                    raise MSMDLyParsingError(e.message)
             else:
-                raise SheetManagerLyParsingError(e.message)
+                raise MSMDLyParsingError(e.message)
 
     @staticmethod
     def parse_ly_file_link(link_str):

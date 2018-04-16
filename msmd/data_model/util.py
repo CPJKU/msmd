@@ -40,20 +40,20 @@ class MSMDMetadataMixin(object):
 
     def load_metadata(self):
         if not hasattr(self, 'metadata_folder'):
-            raise SheetManagerDBError('MSMDMetadataMixin can only operate'
+            raise MSMDDBError('MSMDMetadataMixin can only operate'
                                       ' on classes that have a metadata_folder'
                                       ' attribute!')
         return self._load_metadata_from(getattr(self, 'metadata_folder'))
 
     def dump_metadata(self):
         if not hasattr(self, 'metadata_folder'):
-            raise SheetManagerDBError('MSMDMetadataMixin can only operate'
+            raise MSMDDBError('MSMDMetadataMixin can only operate'
                                       ' on classes that have a metadata_folder'
                                       ' attribute!')
         self._dump_metadata_to(getattr(self, 'metadata_folder'))
 
 
-class SheetManagerDBError(OSError):
+class MSMDDBError(OSError):
     pass
 
 
