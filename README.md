@@ -5,7 +5,7 @@ Multimodal Sheet Music Dataset
 MSMD is a synthetic dataset of 497 pieces of (classical) music
 that contains both audio and score representations of the pieces
 aligned at a fine-grained level (344,742 pairs of noteheads
-aligned to their MIDI counterpart). It can be used for training
+aligned to their audio/MIDI counterpart). It can be used for training
 and evaluating multimodal models that enable crossing from one
 modality to the other, such as retrieving sheet music using recordings
 or following a performance in the score image.
@@ -21,12 +21,18 @@ of the dataset:
 
 MSMD was first used in the paper:
 
-[1] Matthias Dorfer, Jan Hajič jr., Andreas Arzt, Harald Frostel, Gerhard Widmer.
+[1] Matthias Dorfer, Jan Hajič jr., Andreas Arzt, Harald Frostel, Gerhard Widmer.<br>
     Learning Audio-Sheet Music Correspondences for Cross-Modal Retrieval
-    and Piece Identification. In: Transactions of the International Society
-    for Music Information Retrieval, issue 1, 2018. (Submitted.)
+    and Piece Identification.<br>
+    Transactions of the International Society
+    for Music Information Retrieval, issue 1, 2018.
 
 If you use the dataset, we kindly ask that you cite this paper.
+
+The appendix of our article also contains a detailed description of the MSMD dataset
+and its structure.
+If you would like to reproduce or extend our experiments please
+take a look at [our corresponding repository](https://github.com/CPJKU/audio_sheet_retrieval).
 
 
 Getting started (Quick Guide)
