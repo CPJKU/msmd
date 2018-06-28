@@ -283,6 +283,45 @@ class TripleviewPoolIteratorUnsupervised(object):
         return self.prepare(xb, zb, wb)
 
 
+class VariableLengthSequencePoolIterator(TripleviewPoolIteratorUnsupervised):
+    """Expects the pool to output batches of variable-length sequences,
+    which means the data structure is a *list* of 3-D numpy arrays.
+    This requires slightly different handling of the situation where
+    not enough samples are emitted."""
+    def __iter__(self):
+        n_samples = self.k_samples
+        bs = self.batch_size
+
+        # compute current epoch index
+        idx_epoch = np.mod(self.epoch_counter, self.n_epochs)
+
+        for i in range((n_samples + bs - 1) / bs):
+
+            i_start = i * bs + idx_epoch * self.k_samples
+            i_stop = (i + 1) * bs + idx_epoch * self.k_samples
+            sl = slice(i_start, i_stop)
+            xb, zb, wb = self.pool[sl]
+
+            # Changes from TriepleviewPoolIteratorUnsupervised are here.
+            if len(xb) < self.batch_size:
+                n_missing = self.batch_size - len(xb)
+
+                x_con, z_con, w_con = self.pool[0:n_missing]
+
+                xb.extend(x_con) #  = np.concatenate((xb, x_con))
+                zb.extend(z_con) # = np.concatenate((zb, z_con))
+                wb.extend(w_con) # = np.concatenate((wb, w_con))
+
+            yield self.transform(xb, zb, wb)
+
+        self.epoch_counter += 1
+
+        # shuffle train data after full set iteration
+        if self.shuffle and (idx_epoch + 1) == self.n_epochs:
+            self.pool.reset_batch_generator()
+
+
+
 # --- main ---
 
 if __name__ == '__main__':
