@@ -454,6 +454,12 @@ class ScoreInformedTranscriptionPool(object):
         return [sheet_batch, spec_batch, midi_batch]
 
 
+class StaffPool(ScoreInformedTranscriptionPool):
+    """This pool produces snippets and excerpts corresponding to a single line
+    (staff) of the score."""
+    pass
+
+
 def onset_to_coordinates(alignment, mdict, note_events):
     """
     Compute onset to coordinate mapping
@@ -592,7 +598,10 @@ def unwrap_sheet_image(image, system_mungos, mdict, window_top=100, window_botto
     return un_wrapped_image, un_wrapped_coords
 
 
-def prepare_piece_data(collection_dir, piece_name, aug_config=NO_AUGMENT, require_audio=True, load_midi_matrix=False):
+def prepare_piece_data(collection_dir, piece_name,
+                       aug_config=NO_AUGMENT,
+                       require_audio=True,
+                       load_midi_matrix=False):
     """
     :param collection_dir:
     :param piece_name:
