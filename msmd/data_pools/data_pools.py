@@ -631,6 +631,9 @@ class StaffPool(object):
         midi_matrix = self.midi_matrices[i_sheet][i_spec]
         midi_matrix = midi_matrix[np.newaxis, :, :]
 
+        # print('prepare_train_audio(i_sheet={}, i_spec={}): MIDI matrix shape {}'
+        #       ''.format(i_sheet, i_spec, midi_matrix.shape))
+
         return spec, midi_matrix
 
     def prepare_train_image(self, i_sheet, i_spec):
@@ -893,20 +896,25 @@ def split_unwrapped_into_systems(spectrograms, midi_matrices, onset_to_coord_map
                         p_o2c_start_idx = _o2c_idx
                     if _frame > p_last_frame:
                         p_last_frame = _frame + 1
-                        p_o2c_stop_idx = _o2c_idx
+                        p_o2c_stop_idx = _o2c_idx + 1
                 elif _coord > sys_r:
                     break
 
-            staff_o2c_map = perf_o2c_map[p_o2c_start_idx:p_o2c_stop_idx+1]
+            print('Staff bbox {}, performance {}: frames {} - {}'
+                  ''.format(sys_mungo.bounding_box, _perf_idx,
+                            p_first_frame, p_last_frame))
+
+            staff_o2c_map = perf_o2c_map[p_o2c_start_idx:p_o2c_stop_idx]
             current_staff_onset_to_coord_maps.append(staff_o2c_map)
 
             # Pick out frames that belong to this range.
             perf_spectrogram = spectrograms[_perf_idx]
-            staff_spectrogram = perf_spectrogram[p_first_frame:p_last_frame]
+            staff_spectrogram = perf_spectrogram[:, p_first_frame:p_last_frame]
             current_staff_spectrograms.append(staff_spectrogram)
 
             perf_midi_matrix = midi_matrices[_perf_idx]
-            staff_midi_matrix = perf_midi_matrix[p_first_frame:p_last_frame]
+            staff_midi_matrix = perf_midi_matrix[:, p_first_frame:p_last_frame]
+            print('\tStaff MIDI matrix: {}'.format(staff_midi_matrix.shape))
             current_staff_midi_matrices.append(staff_midi_matrix)
 
         # Add the "bundle" for the current staff to the output.

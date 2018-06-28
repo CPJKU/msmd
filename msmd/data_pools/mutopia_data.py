@@ -121,6 +121,11 @@ def load_staff_list_midi(piece_names, aug_config, data_root):
             raise e
             # continue
 
+        print('Piece {}: {} performances, {} staffs'
+              ''.format(piece_name, len(per_staff_image), len(per_staff_specs[0])))
+        for _i_staff, staff_mms in enumerate(per_staff_midi_mats):
+            print('\tS. {} MM shapes: {}'.format(_i_staff, [mm.shape for mm in staff_mms]))
+
         # keep stuff
         all_images.extend(per_staff_image)
         all_specs.extend(per_staff_specs)
@@ -342,7 +347,10 @@ def load_e2e_omr(split_file, config_file=None, test_only=False,
         tr_images, tr_specs, tr_o2c_maps, tr_midis = load_staff_list_midi(split['train'],
                                                                           aug_config=augment,
                                                                           data_root=data_root)
-        tr_pool = StaffPool(tr_images, tr_specs, tr_o2c_maps, tr_midis,
+        tr_pool = StaffPool(tr_images,
+                            tr_specs,
+                            # tr_o2c_maps,
+                            tr_midis,
                             # spec_context=spec_context,
                             # sheet_context_left=sheet_context_left,
                             # sheet_context_right=sheet_context_right,
@@ -353,7 +361,10 @@ def load_e2e_omr(split_file, config_file=None, test_only=False,
         va_images, va_specs, va_o2c_maps, va_midis = load_staff_list_midi(split['valid'],
                                                                           aug_config=va_augment,
                                                                           data_root=data_root)
-        va_pool = StaffPool(va_images, va_specs, va_o2c_maps, va_midis,
+        va_pool = StaffPool(va_images,
+                            va_specs,
+                            # va_o2c_maps,
+                            va_midis,
                             # spec_context=spec_context,
                             # sheet_context_left=sheet_context_left,
                             # sheet_context_right=sheet_context_right,
@@ -370,7 +381,10 @@ def load_e2e_omr(split_file, config_file=None, test_only=False,
         te_images, te_specs, te_o2c_maps, te_midis = load_staff_list_midi(split['test'],
                                                                           aug_config=test_augment,
                                                                           data_root=data_root)
-        te_pool = StaffPool(te_images, te_specs, te_o2c_maps, te_midis,
+        te_pool = StaffPool(te_images,
+                            te_specs,
+                            # te_o2c_maps,
+                            te_midis,
                             # spec_context=spec_context,
                             # sheet_context_left=sheet_context_left,
                             # sheet_context_right=sheet_context_right,
