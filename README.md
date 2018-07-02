@@ -45,7 +45,7 @@ git clone git@github.com:CPJKU/msmd.git
 
 2.) Follow the steps listed in **Setup and Requirements**
 
-3.) [Download]() the preprocessed MSMD data set.
+3.) [Download](http://drive.jku.at/ssf/s/readFile/share/5909/1073003709932334461/publicLink/msmd_aug.zip) the preprocessed MSMD data set.
 
 4.) Check out the [tutorials](tutorials) provided along with this repository.
 
