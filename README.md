@@ -91,7 +91,7 @@ own encoding (PDF for scores, MIDI for performances) and derived features.
 
 An example file structure for a piece with one score and two performances:
 
-
+```
   BachCPE__cpe-bach-rondo__cpe-bach-rondo/
     BachCPE__cpe-bach-rondo__cpe-bach-rondo.ly
     BachCPE__cpe-bach-rondo__cpe-bach-rondo.norm.ly
@@ -130,7 +130,7 @@ An example file structure for a piece with one score and two performances:
             BachCPE__cpe-bach-rondo__cpe-bach-rondo_tempo-1000_ElectricPiano_notes.npy
             BachCPE__cpe-bach-rondo__cpe-bach-rondo_tempo-1000_ElectricPiano_onsets.npy
             BachCPE__cpe-bach-rondo__cpe-bach-rondo_tempo-1000_ElectricPiano_spec.npy
-
+```
 
 Piece
 -----
@@ -221,6 +221,7 @@ MuNG format and Alignment
 
 The MuNG XML for a notehead in MSMD looks like this:
 
+```
 <CropObject xml:id="msmd_aug___BachCPE__cpe-bach-rondo__cpe-bach-rondo_ly-P00___0">
   <Id>0</Id>
   <ClassName>notehead-full</ClassName>
@@ -239,6 +240,7 @@ The MuNG XML for a notehead in MSMD looks like this:
 		<DataItem key="ly_link" type="str">textedit:///media/matthias/Data/msmd_aug/BachCPE__cpe-bach-rondo__cpe-bach-rondo/BachCPE__cpe-bach-rondo__cpe-bach-rondo.norm.ly:704:15:16</DataItem>
   </Data>
 </CropObject>
+```
 
 The xml:id of the <CropObject> is the unique identifier for the given notehead
 within the entire MSMD dataset.
