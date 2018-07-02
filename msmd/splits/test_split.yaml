@@ -1,0 +1,24 @@
+test:
+- BachJS__BWV988__bwv-988-v16
+- BachJS__BWV817__bach-french-suite-6-gavotte
+train:
+- BachJS__BWV846__wtk1-fugue1
+- BachJS__BWV850__bwv850a
+- BachJS__BWV869__bwv869b
+- BachJS__BWV856__BWV856_Fugue11
+- BachJS__BWV777__bach-invention-06
+- BachJS__BWV826__22title-hub
+- BachJS__BWV847__bwv847a
+- BachJS__BWV827__BWV-827-4
+- BachJS__BWV952__fugue-c-major
+- BachJS__BWV790__bwv790
+valid:
+- BachJS__BWV510__BWV-510
+- BachJS__BWV454__bwv_454
+- BachJS__BWV259__bwv-259
+- BachJS__BWVAnh120__BWV-120
+- BachJS__BWV817__bach-french-suite-6-menuet
+- BachJS__BWV988__bwv-988-v22
+- BachJS__BWV816__french-suite-5-gavotte
+- BachJS__BWV816__french-suite-5-loure
+- BachJS__BWV988__bwv-988-v09

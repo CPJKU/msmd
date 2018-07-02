@@ -244,7 +244,33 @@ class ScoreInformedTranscriptionPool(object):
                  sheet_context_right=SHEET_CONTEXT_RIGHT,
                  staff_height=SYSTEM_HEIGHT,
                  data_augmentation=None, shuffle=True):
+        """
 
+        **Key koncept:** the ``train_entities`` contains the "sufficient descriptors"
+        of each training data point. In the case of score-informed transcription
+        by snippet/excerpt, these entities are triples ``(i_sheet, i_spec, i_onset)``.
+        The ``i_sheet`` indexes from which score we will get a snippet, the ``i_spec``
+        says which of the spectrograms of performances of that score will be used,
+        and ``i_onset`` says which notehead/onset pair we will be centering on
+        (the onset is translated to coords through the ``o2c_maps`` entry).
+
+        On ``__getitem__`` call, a ``train_entity`` is chosen, and through
+        ``prepare_train_image()`` and ``prepare_train_audio()`` these "sufficient
+        descriptors" are turned into the actual image and audio representations.
+        Augmentations are applied at this point.
+
+        :param images:
+        :param specs:
+        :param o2c_maps:
+        :param midi_matrices:
+        :param spec_context:
+        :param sheet_context_left:
+        :param sheet_context_right:
+        :param staff_height:
+        :param data_augmentation:
+        :param shuffle:
+        :return:
+        """
         self.images = images
         self.specs = specs
         self.o2c_maps = o2c_maps
@@ -454,9 +480,198 @@ class ScoreInformedTranscriptionPool(object):
         return [sheet_batch, spec_batch, midi_batch]
 
 
+class StaffPool(object):
+    """The StaffPool returns parallel representations entire staffs.
+    This means that it does *not* need spectrogram and score context
+    windows -- it always returns the entire item. On the other hand,
+    I guess augmentations will be more critical here.
+
+    The ``train_entities`` in thise case are only ``(i_sheet, i_spec)``,
+    since we are outputting entire staffs.
+
+    On the other hand, there are other challenges. Each staff corresponds
+    to a different number of frames, as (a) tempos differ, (b) note event
+    densities also vary in different scores due to typesetting reasons.
+    We can standardize the staff size, which is what happens in the real
+    world (scores have a mostly constant page width), but we can't stretch
+    each spectrogram differently to have the same final number of frames:
+    this would amount to standardizing tempo, which we do not want to do.
+
+    (This means that the "context" variables are no longer named aptly:
+    we are not outputting contexts of certain points in the data, the
+    data points themselves are sequences.)
+
+    We don't have a fixed size for the staff, either.
+    """
+    def __init__(self,
+                 images,
+                 specs,
+                 # o2c_maps,  # For now we don't use it, but we might (attn training)
+                 midi_matrices,
+                 staff_width=SHEET_CONTEXT,
+                 staff_height=SYSTEM_HEIGHT,
+                 data_augmentation=None, shuffle=True):
+        """
+
+        :param images: List of staff images.
+
+        :param specs: For each staff image, a list of spectrograms;
+            one for each performance.
+
+        :param midi_matrices: For each staff image, a list of MIDI matrices;
+            one for each performance.
+
+        :param staff_width: Standardized width of the staff image.
+
+        :param staff_height: Standardized height of the staff image.
+
+        :param data_augmentation:
+
+        :param shuffle:
+
+        :return:
+        """
+        self.images = images
+        self.specs = specs
+        # self.o2c_maps = o2c_maps   # No fine-grained alignment used for now.
+        self.midi_matrices = midi_matrices
+
+        self.staff_width = staff_width
+        self.staff_height = staff_height
+
+        self.data_augmentation = data_augmentation
+        self.shuffle = shuffle
+
+        self.shape = None
+        self.sheet_dim = [self.staff_height, self.staff_width]
+        # There is no fixed spectrogram dimension (see above).
+        # If a models expects a fixed size, it has to ensure this
+        # in its prepare() function.
+
+        # There is no interpolation between onsets here.
+        # if self.data_augmentation['interpolate'] > 0:
+        #     self.interpolate()
+
+        self.train_entities = np.zeros((0, 2), dtype=np.int)
+        self.prepare_train_entities()
+
+        if self.shuffle:
+            self.reset_batch_generator()
+
+    def prepare_train_entities(self):
+        """
+        Collect train entities
+        """
+
+        self.train_entities = np.zeros((0, 2), dtype=np.int)
+
+        # iterate sheets (=staffs)
+        for i_sheet, sheet in enumerate(self.images):
+
+            # iterate spectrograms (=staff spectrograms)
+            for i_spec, spec in enumerate(self.specs[i_sheet]):
+
+                cur_entities = np.asarray([i_sheet, i_spec])
+                self.train_entities = np.vstack((self.train_entities, cur_entities))
+
+        # number of train samples
+        self.shape = [self.train_entities.shape[0]]
+
+    def reset_batch_generator(self):
+        """
+        Reset data pool
+        """
+        indices = np.random.permutation(self.shape[0])
+        self.train_entities = self.train_entities[indices]
+
+    def __getitem__(self, key):
+        """
+        Make class accessible by index or slice
+        """
+
+        # Get the train entities for the given batch.
+        if key.__class__ == int:
+            key = slice(key, key + 1)
+        batch_entities = self.train_entities[key]
+
+        # Collect train entities.
+        # Here we run into the problem with shapes, so we cannot
+        # directly return 4-D numpy arrays. Instead, we return lists of 3-D
+        # numpy arrays (channels first).
+        sheet_batch = []
+        spec_batch = []
+        midi_batch = []
+        for i_entity, (i_sheet, i_spec) in enumerate(batch_entities):
+
+            # get sliding window train item
+            staff_image = self.prepare_train_image(i_sheet, i_spec)
+
+            # get spectrogram excerpt (target note in center)
+            staff_excerpt, staff_midi_excerpt = self.prepare_train_audio(i_sheet, i_spec)
+
+            # if midi_excerpt.shape != midi_batch.shape[-2:]:
+            #     raise ValueError('Wrong shape of MIDI excerpt: key {0}'.format(key))
+
+            # collect batch data
+            sheet_batch.append(staff_image)
+            spec_batch.append(staff_excerpt)
+            midi_batch.append(staff_midi_excerpt)
+
+        return [sheet_batch, spec_batch, midi_batch]
+
+    def prepare_train_audio(self, i_sheet, i_spec):
+        """Until some augmentation is applied, this just outputs the spectrogram
+        and MIDI matrix for the entire staff (for the given performance
+        ``i_spec``)."""
+        # get spectrogram and onset
+        spec = self.specs[i_sheet][i_spec]
+        spec = spec[np.newaxis, :, :]
+
+        # get midi matrix
+        midi_matrix = self.midi_matrices[i_sheet][i_spec]
+        midi_matrix = midi_matrix[np.newaxis, :, :]
+
+        # print('prepare_train_audio(i_sheet={}, i_spec={}): MIDI matrix shape {}'
+        #       ''.format(i_sheet, i_spec, midi_matrix.shape))
+
+        return spec, midi_matrix
+
+    def prepare_train_image(self, i_sheet, i_spec):
+        """Applies image augmentation to staff image. Note that it does *not*
+        check whether the image augmentation parameters are "reasonable", e.g.
+        that system translation does not push parts of the staff out of the
+        output vertical range."""
+        sheet = self.images[i_sheet]
+
+        if self.data_augmentation['sheet_scaling']:
+            import cv2
+            sc = self.data_augmentation['sheet_scaling']
+            scale = (sc[1] - sc[0]) * np.random.random_sample() + sc[0]
+            new_size = (int(sheet.shape[1] * scale), int(sheet.shape[0] * scale))
+            sheet = cv2.resize(sheet, new_size, interpolation=cv2.INTER_NEAREST)
+
+        # There is no target coordinate.
+
+        # get vertical crop
+        r0 = sheet.shape[0] // 2 - self.staff_height // 2
+
+        if self.data_augmentation['system_translation']:
+            t = self.data_augmentation['system_translation']
+            r0 += np.random.randint(low=-t, high=t + 1)
+        r1 = r0 + self.staff_height
+
+        # get sheet snippet
+        sheet_snippet = sheet[r0:r1]
+        # Add channels dim
+        sheet_snippet = sheet_snippet[np.newaxis, :, :]
+        return sheet_snippet
+
+##############################################################################
+
+
 def onset_to_coordinates(alignment, mdict, note_events):
     """
-    Compute onset to coordinate mapping
+    Compute onset to coordinate mapping.
     """
     onset_to_coord = np.zeros((0, 2), dtype=np.int)
 
@@ -508,7 +723,8 @@ def systems_to_rois(sys_mungos, window_top=10, window_bottom=10):
 
 def stack_images(images, mungos_per_page, mdict):
     """
-    Re-stitch image
+    Re-stitch image. Modifies the staff mungo coordinates,
+    so that they are valid w.r.t. the new stacked image.
     """
     stacked_image = images[0]
     stacked_page_mungos = [m for m in mungos_per_page[0]]
@@ -533,9 +749,13 @@ def stack_images(images, mungos_per_page, mdict):
     return stacked_image, stacked_page_mungos, mdict
 
 
-def unwrap_sheet_image(image, system_mungos, mdict, window_top=100, window_bottom=100):
+def unwrap_sheet_image(image, system_mungos, mdict, window_top=100, window_bottom=100,
+                       return_system_mungos=False):
     """
-    Unwrap all systems of sheet image to a single "long row"
+    Unwrap all systems of sheet image to a single "long row".
+
+    Modifies the system mungos and the entries in mdict, so that
+    the mungos correspond to how the parts of the image get rearranged.
     """
 
     # get rois from page systems
@@ -555,7 +775,7 @@ def unwrap_sheet_image(image, system_mungos, mdict, window_top=100, window_botto
         # get current roi
         r = rois[j]
 
-        # fix out of image errors
+        # fix out-of-image errors
         pad_top = 0
         pad_bottom = 0
         if r[0, 0] < 0:
@@ -574,8 +794,17 @@ def unwrap_sheet_image(image, system_mungos, mdict, window_top=100, window_botto
         img_end = img_start + system_image.shape[1]
         un_wrapped_image[:, img_start:img_end] = system_image
 
+        # Modify staff mungo position and vertical size
+        staff_new_top = 0 # Now the staff is just a left-right segment.
+        staff_new_bottom = un_wrapped_image.shape[0]
+        staff_new_left = sys_mungo.left + x_offset - r[0, 1]
+        sys_mungo.x = staff_new_top
+        sys_mungo.y = staff_new_left
+        sys_mungo.height = staff_new_bottom - staff_new_top
+
         # get noteheads of current staff
-        staff_noteheads = [mdict[i] for i in sys_mungo.inlinks if mdict[i].clsname == 'notehead-full']
+        staff_noteheads = [mdict[i] for i in sys_mungo.inlinks
+                           if mdict[i].clsname == 'notehead-full']
 
         # compute unwraped coordinates
         for n in staff_noteheads:
@@ -589,10 +818,125 @@ def unwrap_sheet_image(image, system_mungos, mdict, window_top=100, window_botto
     # get relevant part of unwrapped image
     un_wrapped_image = un_wrapped_image[:, :img_end]
 
+    if return_system_mungos:
+        return un_wrapped_image, un_wrapped_coords, system_mungos
     return un_wrapped_image, un_wrapped_coords
 
 
-def prepare_piece_data(collection_dir, piece_name, aug_config=NO_AUGMENT, require_audio=True, load_midi_matrix=False):
+def split_unwrapped_into_systems(spectrograms, midi_matrices, onset_to_coord_maps,
+                                 image, coords, system_mungos):
+    """Split up the spectrograms, midi matrices, onset_to_coord maps,
+    and the image & coords, by system.
+
+    :param spectrograms: List of one spectrogram matrix per performance,
+        corresponding to the entire piece.
+
+    :param midi_matrices: List of one midi matrix per performance, corresponding
+        to the entire piece.
+
+    :param onset_to_coord_maps: List of one onset-to-coord mapping for each
+        performance. The onset-to-coord mapping is an ``n_frames x 2`` array,
+        where each row corresponds to an onset frame. The first column contains
+        the onset frame idxs, the second column contains the corresponding
+        *horizontal* coordinate. This assumes an unwrapped image!
+
+    :param image: The unwrapped image.
+
+    :param coords: A dict that holds an objid --> notehead mungo mapping.
+
+    :param system_mungos: A list of MuNG objects that encode how the unwrapped
+        image & its related data should be split.
+
+    :returns: ``staff_spectrograms, staff_midi_matrices, staff_onset_to_coord_maps,
+        staff_images``.
+
+        ``staff_spectrograms``: for each staff, a list of spectrogram arrays,
+            shape ``n_bins x n_staff_frames``
+
+        ``staff_midi_matrices``: for each staff, a list of midi matrix arrays,
+            shape ``n_midi_bins x n_staff_frames``
+
+        ``staff_onset_to_coord_maps``: for each staff, a list of arrays
+
+
+    """
+    staff_spectrograms = []
+    staff_midi_matrices = []
+    staff_onset_to_coord_maps = []
+    staff_images = []
+
+    n_performances = len(spectrograms)
+
+    for sys_mungo in system_mungos:
+
+        current_staff_spectrograms = []
+        current_staff_midi_matrices = []
+        current_staff_onset_to_coord_maps = []
+
+        sys_t, sys_l, sys_b, sys_r = sys_mungo.bounding_box
+
+        # Get the image cutout
+        staff_image = image[:, sys_l:sys_r]
+
+        for _perf_idx in range(n_performances):
+            perf_o2c_map = onset_to_coord_maps[_perf_idx]
+
+            # Find the frame range for the given performance.
+            # This si the core of the per-staff splitting step.
+            p_first_frame = np.inf
+            p_last_frame = -np.inf
+            # We also want to cut out this range from the o2c
+            # map of the current performance for the given staff.
+            p_o2c_start_idx = np.inf
+            p_o2c_stop_idx = -np.inf
+            for _o2c_idx, (_frame, _coord) in enumerate(perf_o2c_map):
+                if sys_l <= _coord <= sys_r:
+                    if _frame < p_first_frame:
+                        p_first_frame = _frame
+                        p_o2c_start_idx = _o2c_idx
+                    if _frame > p_last_frame:
+                        p_last_frame = _frame + 1
+                        p_o2c_stop_idx = _o2c_idx + 1
+                elif _coord > sys_r:
+                    break
+
+            print('Staff bbox {}, performance {}: frames {} - {}'
+                  ''.format(sys_mungo.bounding_box, _perf_idx,
+                            p_first_frame, p_last_frame))
+
+            staff_o2c_map = perf_o2c_map[p_o2c_start_idx:p_o2c_stop_idx]
+            current_staff_onset_to_coord_maps.append(staff_o2c_map)
+
+            # Pick out frames that belong to this range.
+            perf_spectrogram = spectrograms[_perf_idx]
+            staff_spectrogram = perf_spectrogram[:, p_first_frame:p_last_frame]
+            current_staff_spectrograms.append(staff_spectrogram)
+
+            perf_midi_matrix = midi_matrices[_perf_idx]
+            staff_midi_matrix = perf_midi_matrix[:, p_first_frame:p_last_frame]
+            print('\tStaff MIDI matrix: {}'.format(staff_midi_matrix.shape))
+            current_staff_midi_matrices.append(staff_midi_matrix)
+
+        # Add the "bundle" for the current staff to the output.
+        # (The StaffPool should handle the unwrapping of this;
+        # we need to remember which spectrograms/midi matrices/o2c maps
+        # belong to which staff until it does unwrap that. The list-of-lists
+        # of spectrograms, midi matrices and onset to coord maps
+        # (per staff, per performance) allows the StaffPool to simulate
+        # the prepare_piece_data() outputs by just zipping these lists.
+        staff_images.append(staff_image)
+        staff_spectrograms.append(current_staff_spectrograms)
+        staff_midi_matrices.append(current_staff_midi_matrices)
+        staff_onset_to_coord_maps.append(current_staff_onset_to_coord_maps)
+
+    return staff_spectrograms, staff_midi_matrices, staff_onset_to_coord_maps, \
+        staff_images
+
+
+def prepare_piece_data(collection_dir, piece_name,
+                       aug_config=NO_AUGMENT,
+                       require_audio=True,
+                       load_midi_matrix=False):
     """
     :param collection_dir:
     :param piece_name:
@@ -677,6 +1021,119 @@ def prepare_piece_data(collection_dir, piece_name, aug_config=NO_AUGMENT, requir
         return un_wrapped_image, spectrograms, onset_to_coord_maps, midi_matrices
     else:
         return un_wrapped_image, spectrograms, onset_to_coord_maps
+
+
+def prepare_piece_staff_data(collection_dir, piece_name,
+                             aug_config=NO_AUGMENT,
+                             require_audio=True,
+                             load_midi_matrix=False):
+    """Like prepare_piece_data, but returns lists of entities,
+    one entity for each staff in the given piece. That is:
+    it does *not* unwrap the sheet image -- instead, it cuts up
+    the MIDI matrix and spectrogram.
+
+    :returns:
+    """
+
+    logging.info("\n")
+    logging.info("{0}:\tPiece loading".format(piece_name))
+    piece = Piece(root=collection_dir, name=piece_name)
+    logging.info("{0}:\tScore loading".format(piece_name))
+    score = piece.load_score(piece.available_scores[0])
+
+    logging.info("{0}:\tMuNGo loading".format(piece_name))
+    mungos = score.load_mungos()
+    mdict = {m.objid: m for m in mungos}
+    mungos_per_page = score.load_mungos(by_page=True)
+
+    logging.info("{0}:\tImage loading".format(piece_name))
+    images = score.load_images()
+
+    # stack sheet images
+    logging.info("{0}:\tImage stacking".format(piece_name))
+    image, page_mungos, mdict = stack_images(images, mungos_per_page, mdict)
+
+    # get only system mungos for unwrapping
+    logging.info("{0}:\tSystem MuNGo loading".format(piece_name))
+    system_mungos = [c for c in page_mungos if c.clsname == 'staff']
+    system_mungos = sorted(system_mungos, key=lambda m: m.top)
+
+    # unwrap sheet images
+    logging.info("{0}:\tSheet image unrolling".format(piece_name))
+    un_wrapped_image, un_wrapped_coords, un_wrapped_mungos = \
+        unwrap_sheet_image(image, system_mungos, mdict, return_system_mungos=True)
+
+    # load performances
+    logging.info("{0}:\tPerformance loading".format(piece_name))
+    spectrograms = []
+    midi_matrices = []
+    onset_to_coord_maps = []
+
+    alignments = []
+
+    for performance_key in piece.available_performances:
+
+        # check if performance matches augmentation pattern
+        tempo, synth = performance_key.split("tempo-")[1].split("_", 1)
+        tempo = float(tempo) / 1000
+
+        if synth not in aug_config["synths"]\
+                or tempo < aug_config["tempo_range"][0]\
+                or tempo > aug_config["tempo_range"][1]:
+            continue
+
+        # load current performance
+        performance = piece.load_performance(performance_key,
+                                             require_audio=require_audio)
+
+        # running the alignment procedure
+        alignment = align_score_to_performance(score, performance)
+        alignments.append(alignment)  # Later needed for splitting into staff windows
+
+        # note events
+        note_events = performance.load_note_events()
+
+        # load spectrogram
+        spec = performance.load_spectrogram()
+
+        # compute onset to coordinate mapping
+        onset_to_coord = onset_to_coordinates(alignment,
+                                              un_wrapped_coords,
+                                              note_events)
+        onset_to_coord_maps.append(onset_to_coord)
+
+        if load_midi_matrix:
+            midi = performance.load_midi_matrix()
+
+            if midi.shape[1] != spec.shape[1]:
+                logging.debug('Perf {0}: Midi matrix and spectrogram have'
+                              ' a different number of frames: MM {1}, spec {2}'
+                              ''.format(performance_key, midi.shape[1], spec.shape[1]))
+                n_frames = min(midi.shape[1], spec.shape[1])
+                midi = midi[:, :n_frames]
+                spec = spec[:, :n_frames]
+
+            midi_matrices.append(midi)
+        spectrograms.append(spec)
+
+    # Now split it up by staff.
+    staff_spectrograms, staff_midi_matrices, staff_onset_to_coord_maps, \
+        staff_images = split_unwrapped_into_systems(spectrograms=spectrograms,
+                                                    midi_matrices=midi_matrices,
+                                                    onset_to_coord_maps=onset_to_coord_maps,
+                                                    image=un_wrapped_image,
+                                                    coords=un_wrapped_coords,
+                                                    system_mungos=system_mungos)
+
+    # The StaffPool will have to handle unwrapping this
+    # into training entities.
+
+    if load_midi_matrix:
+        return staff_images, staff_spectrograms, \
+               staff_onset_to_coord_maps, staff_midi_matrices
+    else:
+        return staff_images, staff_spectrograms, staff_onset_to_coord_maps
+
 
 
 def load_audio_score_retrieval():
