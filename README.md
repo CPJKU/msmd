@@ -22,8 +22,9 @@ of the dataset:
 MSMD was first used in the paper:
 
 [1] Matthias Dorfer, Jan Hajič jr., Andreas Arzt, Harald Frostel, Gerhard Widmer.<br>
-    Learning Audio-Sheet Music Correspondences for Cross-Modal Retrieval
-    and Piece Identification.<br>
+    [Learning Audio-Sheet Music Correspondences for Cross-Modal Retrieval
+    and Piece Identification](https://transactions.ismir.net/articles/10.5334/tismir.12/)
+    [PDF](https://transactions.ismir.net/articles/10.5334/tismir.12/galley/8/download/).<br>
     Transactions of the International Society
     for Music Information Retrieval, issue 1, 2018.
 
