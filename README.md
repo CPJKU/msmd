@@ -36,7 +36,8 @@ If you would like to reproduce or extend our experiments please
 take a look at [our corresponding repository](https://github.com/CPJKU/audio_sheet_retrieval).
 
 **Dataset Update 01-17-2019**:
-We recognized alignment errors in a few pieces which are caused by
+After working with the dataset for a while
+we recognized alignment errors in a few pieces which are caused by
 problems with Lilypond (in particular with pieces containing "Da capo").
 The problem usually affected the alignment towards the end of a piece.
 Unfortunately, this is hard to detect and therefore also to fix automatically
