@@ -38,7 +38,7 @@ take a look at [our corresponding repository](https://github.com/CPJKU/audio_she
 **Dataset Update 01-17-2019**:
 We recognized alignment errors in a few pieces which are caused by
 problems with Lilypond (in particular with pieces containing "Da capo").
-The problem usually effected the alignment towards the end of a piece.
+The problem usually affected the alignment towards the end of a piece.
 Unfortunately, this is hard to detect and therefore also to fix automatically
 as Lilypond has no general rule how "Da capos" are encoded.
 Therefore, we decided to remove these pieces from the dataset.
