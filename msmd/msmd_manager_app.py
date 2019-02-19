@@ -55,6 +55,7 @@ import numpy as np
 
 # set backend to qt
 import matplotlib
+matplotlib.use('QT4Agg')
 from muscima.io import export_cropobject_list, parse_cropobject_list
 from msmd.alignments import group_mungos_by_system, \
     group_mungos_by_system_paths, \
@@ -67,7 +68,6 @@ from msmd.ly_parser import mung_midi_from_ly_links
 from msmd.data_model.piece import Piece
 from msmd.data_model.util import MSMDDBError
 
-# matplotlib.use('QT4Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection

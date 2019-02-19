@@ -109,7 +109,7 @@ dependencies:
   - matplotlib==2.1.1
   - mido==1.2.8
   - mock==2.0.0
-  - muscima==0.3.2.dev0
+  - muscima==0.10.0
   - music21==4.1.0
   - networkx==2.0
   - opencv-python==3.4.0.12
@@ -126,3 +126,4 @@ dependencies:
   - scikit-learn==0.19.1
   - scipy==1.0.0
   - subprocess32==3.2.7
+  - future
