@@ -7,8 +7,23 @@ test set contains bach pieces, train and validation contains remaining composers
 # all_split
 train, validation, test split over all composers
 
-# beethoven_out_split
-TODO ...
-
 # bach_split_small
 just for testing
+
+# Update 01-17-2019
+We recognized alignment errors in a few pieces which are caused by
+problems with Lilypond (in particular with pieces containing "Da capos").
+The problem usually effected the alignment towards the end of a piece.
+Unfortunately, this is hard to detect and therefore also to fix automatically
+as Lilypond has no general rule how "Da capos" are encoded.
+Therefore, we decided to remove these pieces from the dataset.
+We updated all splits files accordingly.
+You can still find the original split files in the branch "tismir2018".
+
+The effected pieces (12 out of 479) are listed below:
+
+BachJS__BWV817__bach-french-suite-6-polonaise Traditional__traditioner_af_swenska_folk_dansar.1.16__traditioner_af_swenska_folk_dansar.1.16 Traditional__traditioner_af_swenska_folk_dansar.1.18__traditioner_af_swenska_folk_dansar.1.18 Traditional__traditioner_af_swenska_folk_dansar.1.9__traditioner_af_swenska_folk_dansar.1.9 Traditional__traditioner_af_swenska_folk_dansar.3.1__traditioner_af_swenska_folk_dansar.3.1 Traditional__traditioner_af_swenska_folk_dansar.3.5__traditioner_af_swenska_folk_dansar.3.5
+FischerJKF__Fischer_EratoAllemande__Fischer_EratoAllemande
+MozartWA__KV331__KV331_2_1_menuetto
+SchubertF__D935__SchubertF-D935-2-Impromptu Traditional__traditioner_af_swenska_folk_dansar.1.11__traditioner_af_swenska_folk_dansar.1.11 Traditional__traditioner_af_swenska_folk_dansar.1.33__traditioner_af_swenska_folk_dansar.1.33 Traditional__traditioner_af_swenska_folk_dansar.2.30__traditioner_af_swenska_folk_dansar.2.30
+

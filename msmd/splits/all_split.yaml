@@ -19,7 +19,6 @@ test:
 - Traditional__traditioner_af_swenska_folk_dansar.1.12__traditioner_af_swenska_folk_dansar.1.12
 - BachJS__BWVAnh116__anna-magdalena-07
 - MussorgskyM__pictures-at-an-exhibition__catacombae
-- Traditional__traditioner_af_swenska_folk_dansar.3.1__traditioner_af_swenska_folk_dansar.3.1
 - Traditional__traditioner_af_swenska_folk_dansar.3.19__traditioner_af_swenska_folk_dansar.3.19
 - CzernyC__Op_821__Czerny_Op_821_No_014
 - Traditional__traditioner_af_swenska_folk_dansar.3.6__traditioner_af_swenska_folk_dansar.3.6
@@ -42,11 +41,9 @@ test:
 - BachJS__BWV516__BWV-516
 - Traditional__traditioner_af_swenska_folk_dansar.1.29__traditioner_af_swenska_folk_dansar.1.29
 - Traditional__traditioner_af_swenska_folk_dansar.3.24__traditioner_af_swenska_folk_dansar.3.24
-- Traditional__traditioner_af_swenska_folk_dansar.1.18__traditioner_af_swenska_folk_dansar.1.18
 - BachJS__BWV988__bwv-988-v12
 - BachJS__BWV817__bach-french-suite-6-menuet
 - HandelGF__Aylesford__19-menuet
-- Traditional__traditioner_af_swenska_folk_dansar.1.16__traditioner_af_swenska_folk_dansar.1.16
 - BachJS__BWV779__bach-invention-08
 - Traditional__traditioner_af_swenska_folk_dansar.2.36__traditioner_af_swenska_folk_dansar.2.36
 - BachJS__BWVAnh691__BWV-691
@@ -54,7 +51,6 @@ test:
 - SchumannR__O68__schumann-op68-09-chanson-populaire
 - Traditional__traditioner_af_swenska_folk_dansar.3.17__traditioner_af_swenska_folk_dansar.3.17
 - Traditional__traditioner_af_swenska_folk_dansar.1.4__traditioner_af_swenska_folk_dansar.1.4
-- Traditional__traditioner_af_swenska_folk_dansar.1.9__traditioner_af_swenska_folk_dansar.1.9
 - TchaikovskyPI__O39__16OldFrenchSong
 - Traditional__traditioner_af_swenska_folk_dansar.3.12__traditioner_af_swenska_folk_dansar.3.12
 - Traditional__traditioner_af_swenska_folk_dansar.2.27__traditioner_af_swenska_folk_dansar.2.27
@@ -66,7 +62,6 @@ test:
 - CzernyC__Op_821__Czerny_Op_821_No_009
 - Traditional__traditioner_af_swenska_folk_dansar.1.30__traditioner_af_swenska_folk_dansar.1.30
 - Yaniewicz__leslanciers__leslanciers
-- Traditional__traditioner_af_swenska_folk_dansar.3.5__traditioner_af_swenska_folk_dansar.3.5
 - CzernyC__Op_821__Czerny_Op_821_No_008
 - Traditional__traditioner_af_swenska_folk_dansar.3.13__traditioner_af_swenska_folk_dansar.3.13
 - BurgmullerJFF__O100__25EF-08
@@ -98,7 +93,6 @@ test:
 - BeethovenLv__O79__LVB_Sonate_79_1
 - Traditional__traditioner_af_swenska_folk_dansar.3.9__traditioner_af_swenska_folk_dansar.3.9
 - SchumannR__O68__schumann-op68-04-choral
-- BachJS__BWV817__bach-french-suite-6-polonaise
 train:
 - BeethovenLv__O13__pathetique-1
 - BurgmullerJFF__O100__25EF-07
@@ -149,7 +143,6 @@ train:
 - ChopinFF__O10__chp-10-05-let
 - MozartWA__KV457__sonata2
 - ChopinFF__O69__w10-h-moll-cfi
-- SchubertF__D935__SchubertF-D935-2-Impromptu
 - BachJS__BWV510__BWV-510
 - VerdiG__Traviata_10__Traviata_10
 - SidwellA__miniature-2__miniature-2
@@ -171,7 +164,6 @@ train:
 - MozartWA__KV453a__k453a
 - TchaikovskyPI__O59__dumka
 - BachJS__BWV830__BWV-830-1
-- MozartWA__KV331__KV331_2_1_menuetto
 - Traditional__traditioner_af_swenska_folk_dansar.3.2__traditioner_af_swenska_folk_dansar.3.2
 - VerdiG__Traviata_12__Traviata_12
 - BachJS__BWV853__bwv853a
@@ -200,7 +192,6 @@ train:
 - Traditional__traditioner_af_swenska_folk_dansar.1.17__traditioner_af_swenska_folk_dansar.1.17
 - BeethovenLv__O10__lvb_sonate_10no2_3
 - MozartWA__KV154__k154
-- Traditional__traditioner_af_swenska_folk_dansar.1.11__traditioner_af_swenska_folk_dansar.1.11
 - BachJS__BWV851__bwv851_fugue06
 - BachJS__BWV862__bach-prelude17
 - Mendelssohn-BartholdyF__O19__5.Inquietude
@@ -284,7 +275,6 @@ train:
 - MozartWA__KV457__sonata1
 - SchumannR__O15__SchumannOp15No06
 - ChopinFF__O33__Mazurka-Op33-No1
-- FischerJKF__Fischer_EratoAllemande__Fischer_EratoAllemande
 - BachJS__BWV1006a__bwv-1006a_6
 - RameauJP__sauvages__sauvages
 - BachJS__BWV988__bwv-988-v14
@@ -344,7 +334,6 @@ train:
 - JoplinS__peacherine__peacherine
 - HaydnFJ__HOB-XVI-27__hob-xvi-27-i-allegro-con-brio
 - SousaJP__HandsacrosstheSea__HandsacrosstheSea
-- Traditional__traditioner_af_swenska_folk_dansar.1.33__traditioner_af_swenska_folk_dansar.1.33
 - SousaJP__ElCapitanMarch__ElCapitanMarch
 - SousaJP__sousa_washington_post__sousa_washington_post
 - MozartWA__KV331__KV331_1_6_var5
@@ -451,7 +440,6 @@ train:
 - ScriabinA__O16__scriabine-op16-no1
 - CzernyC__Op_821__Czerny_Op_821_No_005
 - BachJS__BWV865__BWV865_Praeludium20
-- Traditional__traditioner_af_swenska_folk_dansar.2.30__traditioner_af_swenska_folk_dansar.2.30
 - CzernyC__Op_821__Czerny_Op_821_No_003
 - BachJS__BWV860__BWV860_Praeludium15
 - BachJS__BWVAnh115__anna-magdalena-05

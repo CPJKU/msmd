@@ -50,7 +50,6 @@ test:
 - BachJS__BWV829__56title-hub
 - BachJS__BWV814__bach-french-suite-3-sarabande
 - BachJS__BWV988__bwv-988-v21
-- BachJS__BWV817__bach-french-suite-6-polonaise
 - BachJS__BWV1006a__bwv-1006a_6
 - BachJS__BWV829__54title-hub
 - BachJS__BWV816__french-suite-5-sarabande
@@ -229,20 +228,17 @@ train:
 - JoplinS__eugenia__eugenia
 - StraussJJ__O324__blitz
 - HaydnFJ__HOB-XVI-27__hob-xvi-27-iii-presto
-- MozartWA__KV331__KV331_2_1_menuetto
 - BeethovenLv__O10__LVB_Sonate_10no1_1
 - TchaikovskyPI__O59__dumka
 - ChopinFF__O10__chp-10-05-let
 - BeethovenLv__O10__lvb_sonate_10no2_3
 - CzernyC__Op_821__Czerny_Op_821_No_016
-- SchubertF__D935__SchubertF-D935-2-Impromptu
 - JoplinS__a-breeze-from-alabama__a-breeze-from-alabama
 - HandelGF__Aylesford__10-menuetii
 - MussorgskyM__pictures-at-an-exhibition__gnomus
 - MozartWA__KV457__sonata1
 - BeethovenLv__O2__LVB_Sonate_02no1_4
 - HandelGF__Aylesford__06-impertinence
-- Traditional__traditioner_af_swenska_folk_dansar.1.16__traditioner_af_swenska_folk_dansar.1.16
 - KumarR__valse__valse
 - Rimsky-KorsakovN__O11__rimsky-korsakov-op11-3
 - Traditional__traditioner_af_swenska_folk_dansar.3.19__traditioner_af_swenska_folk_dansar.3.19
@@ -332,7 +328,6 @@ train:
 - CzernyC__Op_821__Czerny_Op_821_No_011
 - BurgmullerJFF__O100__25EF-16
 - HandelGF__Aylesford__07-concerto
-- Traditional__traditioner_af_swenska_folk_dansar.1.11__traditioner_af_swenska_folk_dansar.1.11
 - Anonymous__lesgraces__lesgraces
 - BeethovenLv__O78__LVB_Sonate_78_1
 - SousaJP__TheStarsAndStripesForever__TheStarsAndStripesForever
@@ -343,7 +338,6 @@ train:
 - Traditional__traditioner_af_swenska_folk_dansar.3.18__traditioner_af_swenska_folk_dansar.3.18
 - HandelGF__Aylesford__19-menuet
 - ChopinFF__O28__Chop-28-3
-- Traditional__traditioner_af_swenska_folk_dansar.2.30__traditioner_af_swenska_folk_dansar.2.30
 - Traditional__traditioner_af_swenska_folk_dansar.1.15__traditioner_af_swenska_folk_dansar.1.15
 - SchumannR__O68__schumann-op68-03-chanson-fredonnee
 - BurgmullerJFF__O100__25EF-12
@@ -373,7 +367,6 @@ train:
 - SchumannR__O68__schumann-op68-14-petite-etude
 - Traditional__traditioner_af_swenska_folk_dansar.1.19__traditioner_af_swenska_folk_dansar.1.19
 - VerdiG__Traviata_16__Traviata_16
-- FischerJKF__Fischer_EratoAllemande__Fischer_EratoAllemande
 - BrahmsJ__O39__waltz-op39-15
 - Traditional__traditioner_af_swenska_folk_dansar.3.3__traditioner_af_swenska_folk_dansar.3.3
 - ScriabinA__O16__scriabine-op16-no3
@@ -383,7 +376,6 @@ train:
 - Traditional__traditioner_af_swenska_folk_dansar.2.36__traditioner_af_swenska_folk_dansar.2.36
 - Rimsky-KorsakovN__O11__rimsky-korsakov-op11-1
 - KumarR__ailed__ailed
-- Traditional__traditioner_af_swenska_folk_dansar.1.9__traditioner_af_swenska_folk_dansar.1.9
 - MozartWA__KV545__K545-3
 - LisztF__S.172__liszt-consolation-no4
 - BurgmullerJFF__O100__25EF-10
@@ -408,10 +400,8 @@ train:
 - SchumannR__O68__schumann-op68-04-choral
 - CzernyC__Op_821__Czerny_Op_821_No_017
 - BeethovenLv__O2__LVB_Sonate_02no1_3
-- Traditional__traditioner_af_swenska_folk_dansar.3.1__traditioner_af_swenska_folk_dansar.3.1
 - MussorgskyM__pictures-at-an-exhibition__catacombae
 - BurgmullerJFF__O100__25EF-04
-- Traditional__traditioner_af_swenska_folk_dansar.1.33__traditioner_af_swenska_folk_dansar.1.33
 - BurgmullerJFF__O100__25EF-02
 - HandelGF__Aylesford__09-menueti
 - Traditional__traditioner_af_swenska_folk_dansar.1.12__traditioner_af_swenska_folk_dansar.1.12
@@ -444,7 +434,6 @@ train:
 - CzernyC__Op_821__Czerny_Op_821_No_012
 - BehrF__in_may_piano__in_may_piano
 - BurgmullerJFF__O100__25EF-13
-- Traditional__traditioner_af_swenska_folk_dansar.3.5__traditioner_af_swenska_folk_dansar.3.5
 - ScriabinA__O16__scriabine-op16-no5
 - Traditional__traditioner_af_swenska_folk_dansar.1.26__traditioner_af_swenska_folk_dansar.1.26
 - MussorgskyM__pictures-at-an-exhibition__promenade-3
@@ -452,7 +441,6 @@ train:
 - CzernyC__Op_821__Czerny_Op_821_No_003
 - Anonymous__lanative__lanative
 - HandelGF__Aylesford__14-menueti
-- Traditional__traditioner_af_swenska_folk_dansar.1.18__traditioner_af_swenska_folk_dansar.1.18
 - BurgmullerJFF__O100__25EF-07
 valid:
 - Traditional__traditioner_af_swenska_folk_dansar.3.13__traditioner_af_swenska_folk_dansar.3.13

@@ -35,6 +35,16 @@ and its structure.
 If you would like to reproduce or extend our experiments please
 take a look at [our corresponding repository](https://github.com/CPJKU/audio_sheet_retrieval).
 
+**Dataset Update 01-17-2019**:
+After working with the dataset for a while
+we recognized alignment errors in a few pieces which are caused by
+problems with Lilypond (in particular with pieces containing "Da capo").
+The problem usually affected the alignment towards the end of a piece.
+Unfortunately, this is hard to detect and therefore also to fix automatically
+as Lilypond has no general rule how "Da capos" are encoded.
+Therefore, we decided to remove these pieces from the dataset.
+We updated all splits files accordingly (also see ```msmd/splits/README```).
+You can still find the original split files in the branch "tismir2018".
 
 Getting started (Quick Guide)
 -----------------------------
