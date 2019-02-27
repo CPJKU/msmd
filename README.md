@@ -44,7 +44,7 @@ Unfortunately, this is hard to detect and therefore also to fix automatically
 as Lilypond has no general rule how "Da capos" are encoded.
 Therefore, we decided to remove these pieces from the dataset.
 We updated all splits files accordingly (also see ```msmd/splits/README```).
-You can still find the original split files in the branch "tismir2018".
+You can still find the original split files on tag "v1.0".
 
 Getting started (Quick Guide)
 -----------------------------
@@ -307,7 +307,9 @@ Manipulating MSMD
 To explore the code for loading and manipulating MSMD, we suggest
 starting from the function:
 
+```
   data_pools/data_pools.py:prepare_piece_data()
+```
 
 of the accompanying software of MSMD. This function implements
 the preprocessing pipeline described in sec. 3 of article [1],
@@ -320,10 +322,12 @@ module. Going from an abstraction over the entire dataset
 downwards, to abstractions over the Piece and its corresponding
 Performances and Scores, there are classes:
 
+```
   msmd.py:MSMD
   piece.py:Piece
   performance.py:Performance
   score.py:Score
+```
 
 The classes' docstrings contain further details on how to use
 these objects. The classes are quite light-weight and mainly intended
@@ -331,6 +335,8 @@ to ease loading MSMD from Python scripts.
 
 If you want to explore how MSMD was generated, refer to:
 
+```
   sheet_manager_app.py:MSMDManager.process_piece()
+```
 
 The process is described in Appendix A of [1].
