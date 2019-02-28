@@ -39,7 +39,7 @@ import argparse
 import logging
 import pprint
 import time
-from PyQt4 import QtCore, QtGui, Qt, uic
+from PyQt5 import QtCore, QtGui, QtWidgets, Qt, uic
 
 import os
 import copy
@@ -96,10 +96,10 @@ class MSMDManagerError(Exception):
     pass
 
 
-class MSMDManagerGui(QtGui.QMainWindow, form_class):
+class MSMDManagerGui(QtWidgets.QMainWindow, form_class):
 
     def __init__(self, parent):
-        QtGui.QMainWindow.__init__(self, parent)
+        QtWidgets.QMainWindow.__init__(self, parent)
         self.setupUi(self)
 
     def setup_bindings(self, mgr):
@@ -107,7 +107,7 @@ class MSMDManagerGui(QtGui.QMainWindow, form_class):
         Sheet Manager actions."""
 
         # set up status bar
-        self.status_label = QtGui.QLabel("")
+        self.status_label = QtWidgets.QLabel("")
         self.statusbar.addWidget(self.status_label)
 
         # connect to menu
@@ -292,7 +292,7 @@ class MSMDManager(object):
         """
 
         # piece root folder
-        folder_name = str(QtGui.QFileDialog.getExistingDirectory(
+        folder_name = str(QtWidgets.QFileDialog.getExistingDirectory(
             self.gui,
             "Select Sheet Music",
             "."))
@@ -1102,6 +1102,7 @@ class MSMDManager(object):
 
         # set number of onsets in gui
         if self.gui:
+            print(self.onsets)
             self.gui.lineEdit_nOnsets.setText(str(len(self.onsets)))
         
         # self.status_label.setText("done!")
@@ -1174,7 +1175,7 @@ class MSMDManager(object):
 
         # initialize page data (currently loads just empty coords)
         n_pages = len(img_files)
-        for i in xrange(n_pages):
+        for i in range(n_pages):
             self.sheet_pages.append(cv2.imread(img_files[i], 0))
             
             self.page_coords.append(np.zeros((0, 2)))
@@ -1246,7 +1247,7 @@ class MSMDManager(object):
 
         # load data
         if len(coord_files) > 0:
-            for i in xrange(self.n_pages):
+            for i in range(self.n_pages):
                 if os.path.exists(coord_files[i]):
                     self.page_systems[i] = np.load(coord_files[i])
 
@@ -1265,7 +1266,7 @@ class MSMDManager(object):
 
         # load data
         if len(coord_files) > 0:
-            for i in xrange(self.n_pages):
+            for i in range(self.n_pages):
                 if os.path.exists(coord_files[i]):
                     self.page_bars[i] = np.load(coord_files[i])
 
@@ -1283,7 +1284,7 @@ class MSMDManager(object):
 
         # load data
         if len(coord_files) > 0:
-            for i in xrange(self.n_pages):
+            for i in range(self.n_pages):
                 if os.path.exists(coord_files[i]):
                     page_coords = np.load(coord_files[i])
                     self.page_coords[i] = page_coords
@@ -1297,11 +1298,11 @@ class MSMDManager(object):
         self.page_rois = []
 
         # sort systems
-        for i in xrange(self.n_pages):
+        for i in range(self.n_pages):
             sorted_idx = np.argsort(self.page_systems[i][:, 0, 0])
             self.page_systems[i] = self.page_systems[i][sorted_idx]
 
-        for i in xrange(self.n_pages):
+        for i in range(self.n_pages):
             width = self.sheet_pages[i].shape[1]
             self.page_rois.append([])
             for system_coords in self.page_systems[i]:
@@ -1404,7 +1405,7 @@ class MSMDManager(object):
         it just returns the coords in the original order.
         """
 
-        for page_id in xrange(self.n_pages):
+        for page_id in range(self.n_pages):
             page_rois = self.page_rois[page_id]
 
             if page_rois:
@@ -1417,7 +1418,7 @@ class MSMDManager(object):
         """ Sort bar coords by rows """
         from sklearn.metrics.pairwise import pairwise_distances
 
-        for page_id in xrange(self.n_pages):
+        for page_id in range(self.n_pages):
             page_bars = self.page_bars[page_id]
             page_systems = self.page_systems[page_id]
 
@@ -1437,7 +1438,7 @@ class MSMDManager(object):
 
             # assign bars to systems
             bars_by_system = [np.zeros((0, 2, 2))] * page_systems.shape[0]
-            for i in xrange(dists.shape[0]):
+            for i in range(dists.shape[0]):
                 min_idx = np.argmin(dists[i])
                 bars = page_bars[i][np.newaxis, :, :]
                 bars_by_system[min_idx] = np.vstack((bars_by_system[min_idx], bars))
@@ -1485,21 +1486,21 @@ class MSMDManager(object):
     def save_note_coords(self):
         """ Save current note coordinates. """
         coord_dir = self.current_score.coords_dir
-        for i in xrange(len(self.page_coords)):
+        for i in range(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "notes_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_coords[i])
 
     def save_bar_coords(self):
         """ Save current bar coordinates. """
         coord_dir = self.current_score.coords_dir
-        for i in xrange(len(self.page_coords)):
+        for i in range(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "bars_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_bars[i])
 
     def save_system_coords(self):
         """ Save current bar coordinates. """
         coord_dir = self.current_score.coords_dir
-        for i in xrange(len(self.page_coords)):
+        for i in range(len(self.page_coords)):
             coord_file = os.path.join(coord_dir, "systems_%02d.npy" % (i + 1))
             np.save(coord_file, self.page_systems[i])
 
@@ -1809,7 +1810,7 @@ class MSMDManager(object):
                 selection = np.argmin(dists)
 
                 if page_id > 0:
-                    offset = np.sum([len(self.page_coords[i]) for i in xrange(page_id)])
+                    offset = np.sum([len(self.page_coords[i]) for i in range(page_id)])
                     selection += offset
             
                 onset = self.onsets[selection]
@@ -1877,7 +1878,7 @@ class MSMDManager(object):
             import matplotlib.path as mpltPath
 
             # find selected system
-            for i in xrange(len(self.page_systems[page_id])):
+            for i in range(len(self.page_systems[page_id])):
 
                 path = mpltPath.Path(self.page_systems[page_id][i])
                 if path.contains_point(clicked[0]):
@@ -2282,7 +2283,7 @@ def launch_gui(args):
     if args.debug:
         logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     myWindow = MSMDManager(interactive=True)
     if args.data_dir:
         if len(args.pieces) > 0:

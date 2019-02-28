@@ -6,80 +6,33 @@ Created on Mon Jul 11 18:49:33 2016
 """
 
 import os
-import midi as midipy
-from mido import MidiFile, MidiTrack, bpm2tempo, tempo2bpm
-
-
-def set_tempo_events(filename_in, filename_out, tempoevents):
-    """
-    set midi tempo events
-    """
-    midifile = midipy.read_midifile(filename_in)
-    midifile.make_ticks_abs()
-
-    max_tick = 0
-
-    for track in midifile:
-        for event in track:
-            if not isinstance(event, midipy.EndOfTrackEvent):
-                max_tick = max(event.tick, max_tick)
-            if isinstance(event, midipy.SetTempoEvent):
-                track.remove(event)
-
-    for track in midifile:
-        for event in track:
-            if isinstance(event, midipy.EndOfTrackEvent):
-                event.tick = max_tick + 1
-
-    # TODO: adapt tempo for changing signatures
-    # time_signatures = get_time_signature_events(filename_in)
-    #
-    # adaptions = []
-    #
-    # for ts in time_signatures:
-    #     add = [ts.tick, 0, 4.0 / ts.denom]
-    #     adaptions.append(add)
-    #
-    # adaptions[-1][1] = tempoevents[-1].tick + 1
-    #
-    # for row in adaptions:
-    #     for e in tempoevents:
-    #         if e.tick >= row[0] and e.tick < row[1]:
-    #             e.bpm = int(e.bpm * row[2])
-
-    for e in tempoevents:
-        te = midipy.SetTempoEvent(tick=e.tick, bpm=e.bpm)
-        midifile[0].append(te)
-
-    for track in midifile:
-        track.sort()
-
-    midifile.make_ticks_rel()
-    midipy.write_midifile(filename_out, midifile)
+import pretty_midi
 
 
 def set_velocity(filename_in, filename_out, velocity):
     """
     set velocities
     """
-    midifile = midipy.read_midifile(filename_in)
 
-    for track in midifile:
-        for event in track:
-            if isinstance(event, midipy.NoteOnEvent):
-                event.set_velocity(velocity)
+    midifile = pretty_midi.PrettyMIDI(filename_in)
 
-    midipy.write_midifile(filename_out, midifile)
+    for instrument in midifile.instruments:
+        for note in instrument:
+           note.velocity = velocity
+
+    mimidifile.write(filename_out)
 
 
 def set_program(filename_in, filename_out, program):
     """
     set instruments
     """
-    import pretty_midi
+
     midi_data = pretty_midi.PrettyMIDI(filename_in)
+
     for instrument in midi_data.instruments:
         instrument.program = program
+
     midi_data.write(filename=filename_out)
 
 
@@ -95,29 +48,22 @@ class TempoEvent:
 
 def change_midi_file_tempo(input_file, output_file, ratio=1.0):
     """
-    Change the tempo in a midi file
+    Change the tempo in a midi file in a relative way.
     """
-    infile = MidiFile(input_file)
+    midi_data = pretty_midi.PrettyMIDI(input_file)
 
-    with MidiFile() as outfile:
+    # infile = MidiFile(input_file)
+    new_tempi = []
 
-        outfile.type = infile.type
-        outfile.ticks_per_beat = infile.ticks_per_beat
+    for n, (tick, tick_scale) in enumerate(midi_data._tick_scales):
+        # Convert tick of this tempo change to time in seconds
+        tempo_event = (tick, tick_scale*ratio)
+        new_tempi.append(tempo_event)
 
-        for msg_idx, track in enumerate(infile.tracks):
+    # set new tempo to midi
+    midi_data._tick_scales = new_tempi
 
-            out_track = MidiTrack()
-            outfile.tracks.append(out_track)
-
-            for message in track:
-                if message.type == 'set_tempo':
-                    bpm = tempo2bpm(message.tempo)
-                    new_bpm = ratio * bpm
-                    message.tempo = bpm2tempo(new_bpm)
-
-                out_track.append(message)
-
-    outfile.save(output_file)
+    midi_data.write(filename=output_file)
 
 
 def render_audio(input_midi_path, sound_font,
@@ -220,7 +166,8 @@ if __name__ == '__main__':
                 audio_file = os.path.join(audio_directory, new_file_name + ".flac")
 
                 # fix midi tempo
-                set_tempo_events(filename_in, filename_out, [TempoEvent(0, bpm)])
+                # set_tempo_events(filename_in, filename_out, [TempoEvent(0, bpm)])
+                print('set_tempo_events() needs to be implemented with pretty_midi')
 
                 # set velocity
                 set_velocity(filename_out, filename_out, velocity)

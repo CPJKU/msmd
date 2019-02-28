@@ -1,129 +1,23 @@
-name: msmd
+name: msmd3
 dependencies:
-- anaconda-client=1.6.3=py27_0
-- backports=1.0=py27_0
-- backports_abc=0.5=py27_0
-- bleach=1.5.0=py27_0
-- certifi=2016.2.28=py27_0
-- clyent=1.2.2=py27_0
-- configparser=3.5.0=py27h5117587_0
-- cython=0.26=py27_0
-- dbus=1.10.20=0
-- decorator=4.1.2=py27_0
-- entrypoints=0.2.3=py27_0
-- enum34=1.1.6=py27_0
-- expat=2.1.0=0
-- fontconfig=2.12.1=3
-- freetype=2.5.5=2
-- functools32=3.2.3.2=py27_0
-- get_terminal_size=1.0.0=py27_0
-- glib=2.50.2=1
-- gst-plugins-base=1.8.0=0
-- gstreamer=1.8.0=0
-- hdf5=1.8.17=2
-- html5lib=0.9999999=py27_0
-- icu=54.1=0
-- ipykernel=4.6.1=py27_0
-- ipython=5.3.0=py27_0
-- ipython_genutils=0.2.0=py27_0
-- ipywidgets=6.0.0=py27_0
-- jbig=2.1=0
-- jinja2=2.9.6=py27_0
-- jpeg=8d=2
-- jsonschema=2.6.0=py27_0
-- jupyter=1.0.0=py27_3
-- jupyter_client=5.1.0=py27_0
-- jupyter_console=5.2.0=py27_0
-- jupyter_core=4.3.0=py27_0
-- libffi=3.2.1=1
-- libgcc=5.2.0=0
-- libiconv=1.14=0
-- libpng=1.6.30=1
-- libsodium=1.0.10=0
-- libtiff=4.0.6=2
-- libxcb=1.12=1
-- libxml2=2.9.4=0
-- markupsafe=1.0=py27_0
-- mistune=0.7.4=py27_0
-- mkl=2017.0.3=0
-- nbconvert=5.2.1=py27_0
-- nbformat=4.4.0=py27_0
-- notebook=5.0.0=py27_0
-- numpy=1.12.1=py27_0
-- opencv=3.1.0=np112py27_1
-- openssl=1.0.2l=0
-- pandocfilters=1.4.2=py27_0
-- path.py=10.3.1=py27_0
-- pathlib2=2.3.0=py27h6e9d198_0
-- pcre=8.39=1
-- pexpect=4.2.1=py27_0
-- pickleshare=0.7.4=py27h09770e1_0
-- pip=9.0.1=py27_1
-- prompt_toolkit=1.0.15=py27_0
-- ptyprocess=0.5.2=py27_0
-- pygments=2.2.0=py27_0
-- pyqt=4.11.4=py27_4
-- python=2.7.13=0
-- python-dateutil=2.6.1=py27_0
-- pytz=2017.2=py27_0
-- pyyaml=3.12=py27_0
-- pyzmq=16.0.2=py27_0
-- qt=4.8.7=3
-- qtconsole=4.3.1=py27hc444b0d_0
-- readline=6.2=2
-- requests=2.14.2=py27_0
-- scandir=1.5=py27_0
-- setuptools=36.4.0=py27_1
-- simplegeneric=0.8.1=py27_1
-- singledispatch=3.4.0.3=py27_0
-- sip=4.18=py27_0
-- six=1.10.0=py27_0
-- sqlite=3.13.0=0
-- ssl_match_hostname=3.5.0.1=py27_0
-- terminado=0.6=py27_0
-- testpath=0.3.1=py27_0
-- tk=8.5.18=0
-- tornado=4.5.2=py27_0
-- traitlets=4.3.2=py27_0
-- wcwidth=0.1.7=py27_0
-- wheel=0.29.0=py27_0
-- widgetsnbextension=3.0.2=py27_0
-- xz=5.2.3=0
-- yaml=0.1.6=0
-- zeromq=4.1.5=0
-- zlib=1.2.11=0
+- python=3.6
+- numpy
+- matplotlib
+- scikit-learn
+- qt
+- pyqt
+- cython
+- jupyter
 - pip:
-  - abjad==2.21
-  - backports-abc==0.5
-  - backports.functools-lru-cache==1.4
-  - backports.shutil-get-terminal-size==1.0.0
-  - backports.ssl-match-hostname==3.5.0.1
-  - cycler==0.10.0
-  - funcsigs==1.0.2
-  - ipython-genutils==0.2.0
-  - jupyter-client==5.1.0
-  - jupyter-console==5.2.0
-  - jupyter-core==4.3.0
-  - lxml==4.1.1
-  - madmom==0.15.1
-  - matplotlib==2.1.1
-  - mido==1.2.8
-  - mock==2.0.0
-  - muscima==0.10.0
-  - music21==4.1.0
-  - networkx==2.0
-  - opencv-python==3.4.0.12
-  - pbr==3.1.1
-  - pdfminer==20140328
-  - pillow==5.0.0
-  - ply==3.10
-  - prompt-toolkit==1.0.15
-  - pyparsing==2.2.0
-  - python-ly==0.9.5
-  - python-midi==0.2.4
-  - pywavelets==0.5.2
-  - scikit-image==0.13.1
-  - scikit-learn==0.19.1
-  - scipy==1.0.0
-  - subprocess32==3.2.7
-  - future
+  - madmom>=0.15.1
+  - music21>=3.1.0
+  - opencv-python>=3.1.0
+  - pyyaml>=0.1.6
+  - pdfminer.six
+  - python-ly
+  - git+git://github.com/hajicj/muscima#egg=muscima
+  - abjad>=2.21
+  - scikit-image
+  - tqdm
+  - dtw>=1.3
+  - pretty_midi
