@@ -85,7 +85,7 @@ def parse_pdf(fname, target_width=None, with_links=False,
         score_name = CropObject.UID_DEFAULT_DOCUMENT_NAMESPACE
 
     page_no = -1
-    fp = file(fname, 'rb')
+    fp = open(fname, 'rb')
 
     # # ??? What was this doing here?
     # pages = PDFPage.get_pages(fp)
@@ -133,7 +133,7 @@ def parse_pdf(fname, target_width=None, with_links=False,
                     else:
                         target_height = page_height
 
-                if not obj.has_key('Rect'):
+                if 'Rect' not in list(obj.keys()):
                     continue
 
                 bb_coords = obj['Rect']
@@ -142,7 +142,7 @@ def parse_pdf(fname, target_width=None, with_links=False,
                 if target_width is not None:
                     bb_coords = [c * scale for c in bb_coords]
 
-                link_txt = obj['A']['URI']
+                link_txt = obj['A']['URI'].decode()
 
                 # Not a link to a note event!
                 if link_txt.count(':') != 4:

@@ -374,6 +374,7 @@ class MSMDManager(object):
         page_stats, piece_stats = self.collect_stats()
 
         # Log to metadata
+        self.piece.metadata = dict()
         self.piece.metadata['n_pages'] = self.n_pages
         self.piece.metadata['n_performances'] = len(self.piece.performances)
         self.piece.metadata['n_scores'] = len(self.piece.scores)
@@ -872,7 +873,6 @@ class MSMDManager(object):
         mungos = {page: mung_midi_from_ly_links(mungos[page])
                   for page in mungos}
 
-
         system_bboxes = {}
         system_mungo_groups = {}
         _system_start_objid = max([max([m.objid for m in ms])
@@ -903,7 +903,7 @@ class MSMDManager(object):
             )
             _system_start_objid = max([sm.objid for sm in system_mungos]) + 1
 
-            combined_mungos = mungos[page] + system_mungos
+            combined_mungos = list(mungos[page]) + system_mungos
             mungos[page] = combined_mungos
 
         self.page_systems = [[] for _ in range(n_pages)]
@@ -2144,8 +2144,8 @@ class MSMDManager(object):
         # print(sorted_regions)
         if len(staff_mungos) != len(sorted_regions):
             logging.warning('The number of systems detected by the OMR module'
-                            ' ({0}) does not match the number of LTR note'
-                            ' groups ({2}).'
+                            ' ({}) does not match the number of LTR note'
+                            ' groups ({}).'
                             ''.format(len(staff_mungos),
                                       len(sorted_regions)))
         for m, reg in zip(sorted_mungos, sorted_regions):

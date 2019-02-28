@@ -16,7 +16,7 @@ class MSMDLyParsingError(Exception):
 
 
 def mung_midi_from_ly_links(cropobjects):
-    """Adds the ``midi_pitch_code``data attribute for all CropObjects
+    """Adds the ``midi_pitch_code`` data attribute for all CropObjects
     that have a ``ly_link`` data attribute.
 
     May return the CropObjects in a different order.
@@ -275,9 +275,9 @@ class LilyPondLinkPitchParser(object):
                 try:
                     return LilyPondLinkPitchParser.ly_token_to_midi_pitch(ly_token_strict)
                 except Exception as e:
-                    raise MSMDLyParsingError(e.message)
+                    raise MSMDLyParsingError(e)
             else:
-                raise MSMDLyParsingError(e.message)
+                raise MSMDLyParsingError(e)
 
     @staticmethod
     def parse_ly_file_link(link_str):
