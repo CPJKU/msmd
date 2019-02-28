@@ -83,6 +83,14 @@ python setup.py develop --user
 ```
 in the root folder of the package.
 
+For users planning to recreate the dataset from scratch, you need some more programs.
+We cannot support all platforms, because of that we report what was installed on our system:
+
+* Ubuntu 18.04
+* ffmpeg version 3.4.4
+* fluidsynth 1.1.9 (soundfonts should be placed in `~/.fluidsynth`)
+* GNU LilyPond 2.18.2
+* ImageMagick 6.9.7-4 (you have to set these rights in order to make `convert` work properly: https://askubuntu.com/a/1085339)
 
 Dataset structure
 -----------------
