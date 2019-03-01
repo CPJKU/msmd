@@ -86,7 +86,7 @@ from midi_parser import MidiParser, notes_to_onsets, FPS
 
 # Audio augmentation settings:
 #  - fixed SF and tempo combinations for no-aug. training and evaluation,
-fixed_combinations = [(1.0, "ElectricPiano"), (1.0, "grand-piano-YDP-20160804")]
+fixed_combinations = [(1.0, "ElectricPiano"), (2.0, "ElectricPiano"), (1.0, "grand-piano-YDP-20160804")]
 #  - random soundfont and tempo selection for training data augmentation
 tempo_ratios = [0.9, 0.95, 1.0, 1.05, 1.1]
 sound_fonts = ["acoustic_piano_imis_1", "ElectricPiano", "YamahaGrandPiano"]
@@ -331,6 +331,7 @@ class MSMDManager(object):
         # Load
         print('RUNNING: ly2pdf_and_midi()')
         self.ly2pdf_and_midi()
+
         print('RUNNING: pdf2img()')
         self.pdf2img()
 
@@ -339,19 +340,24 @@ class MSMDManager(object):
             print('RUNNING: pdf2coords')
             self.pdf2coords()
 
-        # Audio
+        # Render Audio performances (also augmented versions)
         self.render_audio()
-        self.extract_performance_features(retain_audio=self.retain_audio)
 
-        # Alignment
-        self.load_performance_features()
-        self.load_sheet()
+        # For each performance, do the DTW-alignment and save to mung
+        for performance in self.piece.load_all_performances(require_audio=False,
+                                                            require_midi=True):
+            self.current_performance = performance
+            self.extract_performance_features(retain_audio=self.retain_audio)
+
+            # Alignment
+            self.load_performance_features()
+            self.load_sheet()
 
         # OMR
         if omr:
-
             if not self.omr:
                 self.init_omr()
+
             self.detect_systems()
             self.detect_bars()
 
@@ -528,7 +534,7 @@ class MSMDManager(object):
             current_score = self.piece.load_score(score_name)
         except MSMDDBError as e:
             print('Could not load score {0}: malformed?'
-                  ' Error message: {1}'.format(score_name, e.message))
+                  ' Error message: {1}'.format(score_name, e))
             return
 
         self.score_name = score_name
@@ -555,7 +561,7 @@ class MSMDManager(object):
                                                               require_midi=True)
         except MSMDDBError as e:
             print('Could not load performance {0}: malformed?'
-                  ' Error message: {1}'.format(perf_name, e.message))
+                  ' Error message: {1}'.format(perf_name, e))
             return
 
         self.current_performance = current_performance
@@ -997,6 +1003,7 @@ class MSMDManager(object):
                                        audio_file=audio_file,
                                        midi_file=perf_midi_file,
                                        overwrite=True)
+
             self.piece.update()
             self._refresh_score_and_performance_selection()
 
@@ -1020,8 +1027,6 @@ class MSMDManager(object):
         """
         from midi_parser import MidiParser
 
-        # self.status_label.setText("Parsing performance midi files and audios...")
-
         # For each performance:
         #  - load performance MIDI
         #  - compute onsets
@@ -1031,74 +1036,40 @@ class MSMDManager(object):
         #  - load performance audio
         #  - compute performance spectrogram
         #  = save spectrogram as perf. feature
-        print('Parsing performance midi files and audio...')
-        for performance in self.piece.load_all_performances(require_audio=False,
-                                                            require_midi=True):
+        print('Feature Extraction on midi and audio files...')
 
-            if performance.audio is None:
-                logging.info('Performance {0} has no audio, skipping'
-                             ' performance feature extraction.'
-                             ''.format(performance.name))
-                continue
+        performance = self.current_performance
 
-            audio_file_path = performance.audio
-            midi_file_path = performance.midi
-            if not os.path.isfile(midi_file_path):
-                logging.warn('Performance {0} has no MIDI file, cannot'
-                             ' compute onsets and MIDI matrix. Skipping.'
-                             ''.format(performance.name))
-                continue
+        if performance.audio is None:
+            logging.info('Performance {0} has no audio, skipping'
+                         ' performance feature extraction.'
+                         ''.format(performance.name))
 
-            midi_parser = MidiParser(show=(self.gui and self.gui.checkBox_showSpec.isChecked()))
-            spectrogram, onsets, midi_matrix, note_events = midi_parser.process(
-                midi_file_path,
-                audio_file_path,
-                return_midi_matrix=True)
+        audio_file_path = performance.audio
+        midi_file_path = performance.midi
+        if not os.path.isfile(midi_file_path):
+            logging.warn('Performance {0} has no MIDI file, cannot'
+                         ' compute onsets and MIDI matrix. Skipping.'
+                         ''.format(performance.name))
 
-            performance.add_feature(spectrogram, 'spec.npy', overwrite=True)
-            performance.add_feature(onsets, 'onsets.npy', overwrite=True)
-            performance.add_feature(midi_matrix, 'midi.npy', overwrite=True)
-            performance.add_feature(note_events, 'notes.npy', overwrite=True)
+        midi_parser = MidiParser(show=(self.gui and self.gui.checkBox_showSpec.isChecked()))
+        spectrogram, onsets, midi_matrix, note_events = midi_parser.process(
+            midi_file_path,
+            audio_file_path,
+            return_midi_matrix=True)
 
-            self.onsets = onsets
-            self.midi_matrix = midi_matrix
-            self.spec = spectrogram
-            self.note_events = note_events
+        performance.add_feature(spectrogram, 'spec.npy', overwrite=True)
+        performance.add_feature(onsets, 'onsets.npy', overwrite=True)
+        performance.add_feature(midi_matrix, 'midi.npy', overwrite=True)
+        performance.add_feature(note_events, 'notes.npy', overwrite=True)
 
-            if not retain_audio:
-                os.unlink(audio_file_path)
+        self.onsets = onsets
+        self.midi_matrix = midi_matrix
+        self.spec = spectrogram
+        self.note_events = note_events
 
-        # pattern = self.folder_name + "/audio/*.mid*"
-        # for midi_file_path in glob.glob(pattern):
-        #     print("Processing", midi_file_path)
-        #
-        #     # get file names and directories
-        #     directory = os.path.dirname(midi_file_path)
-        #     file_name = os.path.basename(midi_file_path).split('.')[0]
-        #     audio_file_path = os.path.join(directory, file_name + '.flac')
-        #     spec_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_spec.npy')
-        #     onset_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_onsets.npy')
-        #     midi_matrix_file_path = os.path.join(directory.replace("/audio", "/spec"), file_name + '_midi.npy')
-        #
-        #     # check if to compute spectrogram
-        #     if not self.checkBox_computeSpec.isChecked():
-        #         audio_file_path = None
-        #         self.spec = np.load(spec_file_path)
-        #
-        #     # parse midi file
-        #     midi_parser = MidiParser(show=self.checkBox_showSpec.isChecked())
-        #     Spec, self.onsets, self.midi_matrix = midi_parser.process(midi_file_path,
-        #                                                               audio_file_path,
-        #                                                               return_midi_matrix=True)
-        #
-        #     # save data
-        #     if self.checkBox_computeSpec.isChecked():
-        #         self.spec = Spec
-        #         np.save(spec_file_path, self.spec)
-        #         np.save(midi_matrix_file_path, self.midi_matrix)
-        #
-        #     np.save(onset_file_path, self.onsets)
-        #
+        if not retain_audio:
+            os.unlink(audio_file_path)
 
         # set number of onsets in gui
         if self.gui:
@@ -1122,7 +1093,7 @@ class MSMDManager(object):
         except MSMDDBError as e:
             logging.warning('Loading midi matrix from current performance {0}'
                             ' failed: {1}'.format(self.current_performance.name,
-                                                  e.message))
+                                                  e))
             return
         self.midi_matrix = midi_matrix
 
@@ -1131,7 +1102,7 @@ class MSMDManager(object):
         except MSMDDBError as e:
             logging.warning('Loading onsets from current performance {0}'
                             ' failed: {1}'.format(self.current_performance.name,
-                                                  e.message))
+                                                  e))
             return
         self.onsets = onsets
 
@@ -1140,7 +1111,7 @@ class MSMDManager(object):
         except MSMDDBError as e:
             logging.warning('Loading spectrogram from current performance {0}'
                             ' failed: {1}'.format(self.current_performance.name,
-                                                  e.message))
+                                                  e))
             return
         self.spec = spectrogram
 
@@ -1149,7 +1120,7 @@ class MSMDManager(object):
         except MSMDDBError as e:
             logging.warning('Loading note events from current performance {0}'
                             ' failed: {1}'.format(self.current_performance.name,
-                                                  e.message))
+                                                  e))
             return
         self.note_events = notes
 
@@ -1335,6 +1306,7 @@ class MSMDManager(object):
         self.load_performance_features()
 
         _perf_name = self.current_performance.name
+        print(_perf_name)
         for i, mungos in enumerate(self.page_mungos):
             for m in mungos:
                 if m.objid not in self.score_performance_alignment:
