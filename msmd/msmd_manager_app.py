@@ -86,7 +86,7 @@ from midi_parser import MidiParser, notes_to_onsets, FPS
 
 # Audio augmentation settings:
 #  - fixed SF and tempo combinations for no-aug. training and evaluation,
-fixed_combinations = [(1.0, "ElectricPiano"), (2.0, "ElectricPiano"), (1.0, "grand-piano-YDP-20160804")]
+fixed_combinations = [(1.0, "ElectricPiano"), (1.0, "grand-piano-YDP-20160804")]
 #  - random soundfont and tempo selection for training data augmentation
 tempo_ratios = [0.9, 0.95, 1.0, 1.05, 1.1]
 sound_fonts = ["acoustic_piano_imis_1", "ElectricPiano", "YamahaGrandPiano"]
@@ -1053,17 +1053,19 @@ class MSMDManager(object):
                          ''.format(performance.name))
 
         midi_parser = MidiParser(show=(self.gui and self.gui.checkBox_showSpec.isChecked()))
-        spectrogram, onsets, midi_matrix, note_events = midi_parser.process(
+        spectrogram, onsets, durations, midi_matrix, note_events = midi_parser.process(
             midi_file_path,
             audio_file_path,
             return_midi_matrix=True)
 
         performance.add_feature(spectrogram, 'spec.npy', overwrite=True)
         performance.add_feature(onsets, 'onsets.npy', overwrite=True)
+        performance.add_feature(durations, 'durations.npy', overwrite=True)
         performance.add_feature(midi_matrix, 'midi.npy', overwrite=True)
         performance.add_feature(note_events, 'notes.npy', overwrite=True)
 
         self.onsets = onsets
+        self.durations = durations
         self.midi_matrix = midi_matrix
         self.spec = spectrogram
         self.note_events = note_events
@@ -1313,9 +1315,10 @@ class MSMDManager(object):
                     continue
                 e_idx = self.score_performance_alignment[m.objid]
                 e = self.note_events[e_idx]
-                onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
                 m.data['{0}_onset_seconds'.format(_perf_name)] = e[0]
-                m.data['{0}_onset_frame'.format(_perf_name)] = int(onset_frame)
+                m.data['{0}_duration_seconds'.format(_perf_name)] = e[2]
+                m.data['{0}_onset_frame'.format(_perf_name)] = int(self.onsets[e_idx])
+                m.data['{0}_duration_frame'.format(_perf_name)] = int(self.durations[e_idx])
                 m.data['{0}_note_event_idx'.format(_perf_name)] = e_idx
 
             page_stats = alignment_stats(mungos,

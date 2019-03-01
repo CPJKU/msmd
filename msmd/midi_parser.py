@@ -15,8 +15,6 @@ import glob
 import numpy as np
 import matplotlib.pyplot as plt
 
-import music21
-
 import madmom.io.midi as mm_midi
 # import madmom.utils.midi_old as mm_midi
 from madmom.audio.signal import SignalProcessor, FramedSignalProcessor
@@ -96,53 +94,22 @@ class MidiParser(object):
             plt.imshow(Spec, cmap='viridis', interpolation='nearest', aspect='auto', origin='lower')
             plt.colorbar()
 
-        s = music21.midi.translate.midiFilePathToStream(midi_file_path)
+        # load midi file
+        m = mm_midi.MIDIFile(midi_file_path)
 
-        mf = music21.midi.translate.streamToMidiFile(s)
-        n_tracks = len(mf.tracks)
-
-        for i_track, track in enumerate(mf.tracks[0:1]):
-            #            st = music21.midi.translate.midiTrackToStream(track, ticksPerQuarter=mf.ticksPerQuarterNote)
-            #
-            #            time, onsets = 0.0, []
-            #            for i_evt, evt in enumerate(track.events):
-            #
-            #                if evt.isDeltaTime() and evt.time > 0:
-            #                    onsets.append(time / 1024 * 60)
-            #                    time += evt.time
-            #
-            #                if evt.isNoteOn():
-            #                    print evt
-            #
-            #            # write temporary midi
-            #            mfile = "tmp/tmp_%d.mid" % i_track
-            #            st.write('midi', mfile)
-
-            # parse midi file
-            # m = mm_midi.MIDIFile.from_file(mfile)
-            m = mm_midi.MIDIFile(midi_file_path)
-            # print midi_file_path, m.notes()
-
-            # Order notes by onset and top-down in simultaneities
-            notes = np.asarray(sorted(m.notes, key=lambda n: (n[0], n[1] * -1)))
-            onsets = notes_to_onsets(notes, dt=1.0 / FPS)
-            midi_matrix = notes_to_matrix(notes, dt=1.0 / FPS)
-
-            # show results
-            if self.show:
-                # print onsets
-                for o in onsets:
-                    plt.plot([o, o], [0, Spec.shape[0] - 1], '-', color=colors[i_track], linewidth=2, alpha=1.0)
-                # plt.xlim([0, Spec.shape[1]-1])
-                plt.ylim([0, Spec.shape[0] - 1])
+        # Order notes by onset and top-down in simultaneities
+        notes = np.asarray(sorted(m.notes, key=lambda n: (n[0], n[1] * -1)))
+        onsets = notes_to_onsets(notes, dt=1.0 / FPS)
+        durations = np.asarray([int(np.ceil(n[2] * FPS)) for n in notes])
+        midi_matrix = notes_to_matrix(notes, dt=1.0 / FPS)
 
         if self.show:
             plt.show(block=True)
 
         if return_midi_matrix:
-            return Spec, onsets, midi_matrix, notes
+            return Spec, onsets, durations, midi_matrix, notes
         else:
-            return Spec, onsets
+            return Spec, onsets, durations
 
 
 if __name__ == '__main__':
