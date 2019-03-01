@@ -10,7 +10,6 @@ dependencies:
 - jupyter
 - pip:
   - madmom>=0.15.1
-  - music21>=3.1.0
   - opencv-python>=3.1.0
   - pyyaml>=0.1.6
   - pdfminer.six
