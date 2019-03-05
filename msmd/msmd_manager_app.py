@@ -39,13 +39,11 @@ import argparse
 import logging
 import pprint
 import time
-from PyQt5 import QtCore, QtGui, QtWidgets, Qt, uic
+from PyQt5 import QtWidgets, uic
 
 import os
-import copy
 import cv2
 import glob
-import shutil
 import pickle
 import yaml
 import sys
@@ -310,14 +308,14 @@ class MSMDManager(object):
         """
         if not os.path.isdir(piece_folder):
             raise MSMDManagerError('Piece folder not found: {0}'
-                                    ''.format(piece_folder))
+                                   ''.format(piece_folder))
 
         is_workflow_ly = (workflow == "ly") or (workflow == "Ly")
         if not is_workflow_ly:
             raise MSMDManagerError('Only the LilyPond workflow is currently '
-                                    ' supported!'
-                                    ' Use arguments workflow="ly" or "Ly". '
-                                    ' (Got: workflow="{0}")'.format(workflow))
+                                   ' supported!'
+                                   ' Use arguments workflow="ly" or "Ly". '
+                                   ' (Got: workflow="{0}")'.format(workflow))
 
         self.reset()
 
@@ -325,8 +323,8 @@ class MSMDManager(object):
 
         if is_workflow_ly and not self.lily_file:
             raise MSMDManagerError('Piece does not have LilyPond source'
-                                    ' available; cannot process with workflow={0}'
-                                    ''.format(workflow))
+                                   ' available; cannot process with workflow={0}'
+                                   ''.format(workflow))
 
         # Load
         print('RUNNING: ly2pdf_and_midi()')
@@ -399,7 +397,7 @@ class MSMDManager(object):
 
         if not os.path.isdir(piece_folder):
             raise MSMDManagerError('Piece folder not found: {0}'
-                                    ''.format(piece_folder))
+                                   ''.format(piece_folder))
         self.load_piece(piece_folder)
         self.load_performance_features()
         self.load_sheet(update_alignment=False)
@@ -443,9 +441,7 @@ class MSMDManager(object):
         mungos = self.page_mungos[page]
 
         note_events = self.note_events
-        first_index = note_events.shape[0]
         first_onset = np.inf
-        last_index = 0
         last_onset = 0
 
         for m in mungos:
@@ -455,10 +451,8 @@ class MSMDManager(object):
                 e_onset = e[0]
                 if e_onset < first_onset:
                     first_onset = e_onset
-                    first_index = e_idx
                 if e_onset > last_onset:
                     last_onset = e_onset
-                    last_index = e_idx
 
         page_event_dict = {e_idx: e for e_idx, e in enumerate(note_events)
                            if first_onset <= e[0] <= last_onset}
@@ -1025,7 +1019,6 @@ class MSMDManager(object):
         to have any useful runtime feature extraction for performance test
         data!)
         """
-        from midi_parser import MidiParser
 
         # For each performance:
         #  - load performance MIDI
@@ -1077,7 +1070,7 @@ class MSMDManager(object):
         if self.gui:
             print(self.onsets)
             self.gui.lineEdit_nOnsets.setText(str(len(self.onsets)))
-        
+
         # self.status_label.setText("done!")
 
     # -w- GUI
@@ -1150,7 +1143,7 @@ class MSMDManager(object):
         n_pages = len(img_files)
         for i in range(n_pages):
             self.sheet_pages.append(cv2.imread(img_files[i], 0))
-            
+
             self.page_coords.append(np.zeros((0, 2)))
             self.page_rois.append([])
             self.page_systems.append(np.zeros((0, 4, 2)))
@@ -1439,7 +1432,7 @@ class MSMDManager(object):
             self.gui.lineEdit_nSystems.setText(str(self.n_systems))
             self.gui.lineEdit_nCoords.setText(str(self.n_coords))
             self.gui.lineEdit_nBars.setText(str(self.n_bars))
-    
+
     def save_coords(self):
         """ Save changed sheet coords """
         self.save_system_coords()
@@ -1511,7 +1504,6 @@ class MSMDManager(object):
             logging.info('Cannot plot sheet without GUI.')
             return
         # print('Calling plot_sheet')
-
 
         # Preserving the view/zoom history
         # prev_toolbar = plt.gcf().canvas.toolbar
@@ -1697,13 +1689,17 @@ class MSMDManager(object):
                 p = do.pop(0)
                 p.remove()
 
-            do = ax.plot([self.click_0[1], self.click_0[1]], [self.click_0[0], click_1[0]], 'r-', linewidth=2, alpha=0.5)
+            do = ax.plot([self.click_0[1], self.click_0[1]], [self.click_0[0], click_1[0]],
+                         'r-', linewidth=2, alpha=0.5)
             self.drawObjects.append(do)
-            do = ax.plot([click_1[1], click_1[1]], [self.click_0[0], click_1[0]], 'r-', linewidth=2, alpha=0.5)
+            do = ax.plot([click_1[1], click_1[1]], [self.click_0[0], click_1[0]],
+                         'r-', linewidth=2, alpha=0.5)
             self.drawObjects.append(do)
-            do = ax.plot([self.click_0[1], click_1[1]], [self.click_0[0], self.click_0[0]], 'r-', linewidth=2, alpha=0.5)
+            do = ax.plot([self.click_0[1], click_1[1]], [self.click_0[0], self.click_0[0]],
+                         'r-', linewidth=2, alpha=0.5)
             self.drawObjects.append(do)
-            do = ax.plot([self.click_0[1], click_1[1]], [click_1[0], click_1[0]], 'r-', linewidth=2, alpha=0.5)
+            do = ax.plot([self.click_0[1], click_1[1]], [click_1[0], click_1[0]],
+                         'r-', linewidth=2, alpha=0.5)
             self.drawObjects.append(do)
             ax.hold(False)
 
@@ -1731,7 +1727,7 @@ class MSMDManager(object):
 
         # current page
         page_id = self.gui.spinBox_page.value()
-        
+
         # position of click
         clicked = np.asarray([event.ydata, event.xdata]).reshape([1, 2])
 
@@ -1740,7 +1736,7 @@ class MSMDManager(object):
         # That was not apparent until we started playing around with retaining the zoom.
         # Maybe: better to change this to double-click?
         if event.button == 3:
-            
+
             plt.figure("Spectrogram")
             plt.clf()
 
@@ -1787,7 +1783,7 @@ class MSMDManager(object):
                 if page_id > 0:
                     offset = np.sum([len(self.page_coords[i]) for i in range(page_id)])
                     selection += offset
-            
+
                 onset = self.onsets[selection]
 
             logging.debug('Pitch: {0}, onset: {1}, aln_pitch: {2}'
@@ -1806,8 +1802,8 @@ class MSMDManager(object):
             # plot midi matrix
             if self.midi_matrix is not None:
                 plt.subplot(2, 1, 2)
-                plt.imshow(np.max(self.midi_matrix) - self.midi_matrix, aspect='auto', cmap=plt.cm.gray, interpolation='nearest',
-                           vmin=0, vmax=np.max(self.midi_matrix))
+                plt.imshow(np.max(self.midi_matrix) - self.midi_matrix, aspect='auto', cmap=plt.cm.gray,
+                           interpolation='nearest', vmin=0, vmax=np.max(self.midi_matrix))
                 plt.plot([onset, onset], [0, self.midi_matrix.shape[0]], 'k-', linewidth=2.0, alpha=0.5)
                 if pitch is not None:
                     plt.plot([onset], [pitch], 'ro', alpha=0.5)
@@ -1918,18 +1914,18 @@ class MSMDManager(object):
 
         # remove note position
         if self.gui.radioButton_deleteNote.isChecked():
-            
+
             # find closets note
             dists = pairwise_distances(clicked, self.page_coords[page_id])
             selection = np.argmin(dists)
-            
+
             # remove coordinate
             self.page_coords[page_id] = np.delete(self.page_coords[page_id], selection, axis=0)
             logging.info("Removed note with id:", selection)
-        
+
         # update sheet statistics
         self.update_sheet_statistics()
-        
+
         # update notehead-onset alignment
         self.sort_note_coords()
         self.sort_bar_coords()
@@ -1945,7 +1941,7 @@ class MSMDManager(object):
         """
         self.window_top = self.gui.spinBox_window_top.value()
         self.window_bottom = self.gui.spinBox_window_bottom.value()
-    
+
     def match_audio2sheet(self):
         """
         Match audio to sheet images
@@ -2154,9 +2150,9 @@ class MSMDManager(object):
                            ''.format(self.current_performance.name)
         if perf_attr_string not in mungo.data:
             raise MSMDManagerError('Cannot get onset frame from MuNG'
-                                    ' object {0}: data attribute {1} is'
-                                    ' missing!'.format(mungo.objid,
-                                                       perf_attr_string))
+                                   ' object {0}: data attribute {1} is'
+                                   ' missing!'.format(mungo.objid,
+                                                      perf_attr_string))
         return mungo.data[perf_attr_string]
 
     def _aligned_onset_and_pitch(self, mungo):
@@ -2340,10 +2336,10 @@ def run_batch_mode(args):
                     mgr.piece.metadata['n_performances'] = len(mgr.piece.performances)
                     mgr.piece.metadata['n_scores'] = len(mgr.piece.scores)
                     mgr.piece.metadata['aln_piece_stats'] = dict([kv for kv in global_stats._asdict().items()
-                                                                   if isinstance(kv[1], int)])
+                                                                  if isinstance(kv[1], int)])
                     mgr.piece.metadata['aln_page_stats'] = [dict([kv for kv in s._asdict().items()
-                                                                   if isinstance(kv[1], int)])
-                                                             for s in page_stats.values()]
+                                                                  if isinstance(kv[1], int)])
+                                                            for s in page_stats.values()]
 
                     # Coming up with the processing & alignment flags if the piece didn't have any.
                     if any(is_aln_problem(stats) for stats in page_stats.values()):
@@ -2432,7 +2428,6 @@ def run_batch_mode(args):
 
         else:
             n_useful_notes += len(global_stats.mungos_aligned_correct_pitch)
-
 
     ##########################################################################
 

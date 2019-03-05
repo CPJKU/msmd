@@ -64,7 +64,7 @@ def align_score_to_performance(score, performance):
     mdict = dict()
     for m_col in ordered_mungo_cols:
         for m in m_col:
-            mdict[m.objid] =  m
+            mdict[m.objid] = m
 
     for m_objid, e_idx in aln:
         m = mdict[m_objid]
@@ -180,11 +180,9 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
                 _frames = [int(numpy.ceil(_e[0] / 0.05)) for _e in sorted_e_group]
                 logging.debug('Matched column pitches, frame {2}:'
                               '\n\tMuNG:   {0}'
-                              '\n\tEvents: {1}'.format(
-                    [_m.data['midi_pitch_code'] for _m in sorted_m_group],
-                    [_e[1] for _e in sorted_e_group],
-                    _frames[0]
-                ))
+                              '\n\tEvents: {1}'.format([_m.data['midi_pitch_code'] for _m in sorted_m_group],
+                                                       [_e[1] for _e in sorted_e_group],
+                                                       _frames[0]))
                 logging.debug('\tAln path: {0}'.format(c_path))
 
             for c_i, c_j in zip(c_path[0], c_path[1]):
@@ -194,7 +192,7 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
                         != sorted_e_group[int(c_j)][1]:
                     continue
                 aln.append((sorted_m_group[int(c_i)].objid,
-                            _e2idx[tuple( sorted_e_group[int(c_j)] )]
+                            _e2idx[tuple(sorted_e_group[int(c_j)])]
                             ))
 
             # Clear groups for next

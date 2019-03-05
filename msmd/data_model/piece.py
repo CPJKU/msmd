@@ -1,15 +1,11 @@
 """This module implements the abstraction over a given piece
 of music."""
 from __future__ import print_function
-
 import logging
 import os
 import shutil
-
-import sys
-
 import time
-import yaml
+from operator import itemgetter
 
 from msmd.data_model.performance import Performance
 from msmd.data_model.score import Score
@@ -85,12 +81,12 @@ class Piece(MSMDMetadataMixin):
 
         if not os.path.isdir(root):
             raise MSMDDBError('Collection root directory does not'
-                                      ' exist: {0}'.format(root))
+                              ' exist: {0}'.format(root))
 
         piece_folder = os.path.join(root, name)
         if not os.path.isdir(piece_folder):
             raise MSMDDBError('Piece {0} in collection {1} does'
-                                      ' not exist'.format(name, root))
+                              ' not exist'.format(name, root))
 
         if authority_format not in self.AVAILABLE_AUTHORITIES:
             raise ValueError('Authority format not supported: {0}'
@@ -109,11 +105,11 @@ class Piece(MSMDMetadataMixin):
         self.encodings = self.collect_encodings()
         if authority_format not in self.encodings:
             raise MSMDDBError('Piece {0} in collection {1} does'
-                                      ' not have the requested authority'
-                                      ' encoding {2}. (Available encodings:'
-                                      ' {3}'.format(self.name, root,
-                                                    authority_format,
-                                                    self.encodings.values()))
+                              ' not have the requested authority'
+                              ' encoding {2}. (Available encodings:'
+                              ' {3}'.format(self.name, root,
+                                            authority_format,
+                                            self.encodings.values()))
         self.authority_format = authority_format
         self.authority = self.encodings[authority_format]
 
@@ -183,11 +179,11 @@ class Piece(MSMDMetadataMixin):
         self.update()
         if score_name not in self.scores:
             raise MSMDDBError('Piece {0} in collection {1} does'
-                                      ' not have a score with name {2}.'
-                                      ' Available scores: {3}'
-                                      ''.format(self.name, self.collection_root,
-                                                score_name,
-                                                self.available_scores))
+                              ' not have a score with name {2}.'
+                              ' Available scores: {3}'
+                              ''.format(self.name, self.collection_root,
+                                        score_name,
+                                        self.available_scores))
         score_dir = self.scores[score_name]
         score = Score(folder=score_dir, piece_name=self.name)
         return score
@@ -202,11 +198,11 @@ class Piece(MSMDMetadataMixin):
         self.update()
         if performance_name not in self.performances:
             raise MSMDDBError('Piece {0} in collection {1} does'
-                                      ' not have a performance with name {2}.'
-                                      ' Available performances: {3}'
-                                      ''.format(self.name, self.collection_root,
-                                                performance_name,
-                                                self.available_performances))
+                              ' not have a performance with name {2}.'
+                              ' Available performances: {3}'
+                              ''.format(self.name, self.collection_root,
+                                        performance_name,
+                                        self.available_performances))
         performance_dir = self.performances[performance_name]
         performance = Performance(folder=performance_dir,
                                   piece_name=self.name,
@@ -218,6 +214,35 @@ class Piece(MSMDMetadataMixin):
         Performance initialization kwargs."""
         return [self.load_performance(p, **perf_kwargs)
                 for p in self.available_performances]
+
+    def load_alignment(self, performance_name):
+        if performance_name not in self.performances:
+            raise MSMDDBError('Piece {0} in collection {1} does'
+                              ' not have a performance with name {2}.'
+                              ' Available performances: {3}'
+                              ''.format(self.name, self.collection_root,
+                                        performance_name,
+                                        self.available_performances))
+
+        score = self.load_score(self.available_scores[0])
+        mungos = score.load_mungos()
+        aln = list()
+
+        for cur_mung in mungos:
+            onset_key = performance_name + '_onset_seconds'
+
+            # check if this note has an alignment associated to it
+            if onset_key not in cur_mung.data.keys():
+                continue
+
+            cur_note_event_idx = cur_mung.data[performance_name + '_note_event_idx']
+
+            aln.append((cur_mung.objid, cur_note_event_idx))
+
+        # sort by appearance in MIDI matrix
+        aln.sort(key=itemgetter(1))
+
+        return aln
 
     def update(self):
         """Refreshes the index of available performances
@@ -239,12 +264,12 @@ class Piece(MSMDMetadataMixin):
                              ''.format(authority_format))
         if authority_format not in self.encodings:
             raise MSMDDBError('Piece {0} in collection {1} does'
-                                      ' not have the requested authority'
-                                      ' encoding {2}. (Available encodings:'
-                                      ' {3}'.format(self.name,
-                                                    self.collection_root,
-                                                    authority_format,
-                                                    self.encodings.values()))
+                              ' not have the requested authority'
+                              ' encoding {2}. (Available encodings:'
+                              ' {3}'.format(self.name,
+                                            self.collection_root,
+                                            authority_format,
+                                            self.encodings.values()))
         self.authority_format = authority_format
         self.authority = self.encodings[authority_format]
 
@@ -396,7 +421,7 @@ class Piece(MSMDMetadataMixin):
                 self.remove_performance(name)
             else:
                 raise MSMDDBError('Piece {0}: performance {1} already'
-                                          ' exists!'.format(self.name, name))
+                                  ' exists!'.format(self.name, name))
         new_performance_dir = os.path.join(self.performance_dir, name)
 
         # This part should be refactored as performance.build_performance()
@@ -404,7 +429,7 @@ class Piece(MSMDMetadataMixin):
 
         audio_fmt = os.path.splitext(audio_file)[-1]
         performance_audio_filename = os.path.join(new_performance_dir,
-                                           name + audio_fmt)
+                                                  name + audio_fmt)
         shutil.copyfile(audio_file, performance_audio_filename)
 
         if midi_file:
@@ -460,7 +485,7 @@ class Piece(MSMDMetadataMixin):
                 self.remove_score(name)
             else:
                 raise MSMDDBError('Piece {0}: performance {1} already'
-                                          ' exists!'.format(self.name, name))
+                                  ' exists!'.format(self.name, name))
         new_score_dir = os.path.join(self.score_dir, name)
 
         os.mkdir(new_score_dir)

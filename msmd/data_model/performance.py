@@ -1,12 +1,9 @@
 """This module implements a class that represents a performance
 of a given piece."""
 from __future__ import print_function
-
 import logging
 import os
-
 import numpy
-import yaml
 
 from msmd.data_model.util import MSMDDBError, path2name, MSMDMetadataMixin
 
@@ -41,8 +38,8 @@ class Performance(MSMDMetadataMixin):
 
         if not os.path.isdir(folder):
             raise MSMDDBError('Performance initialized with'
-                                      ' non-existent directory: {0}'
-                                      ''.format(folder))
+                              ' non-existent directory: {0}'
+                              ''.format(folder))
         self.folder = folder
         name = path2name(folder)
         self.name = name
@@ -180,8 +177,7 @@ class Performance(MSMDMetadataMixin):
                 self.piece_name + suffix,
                 self.name + suffix,
             ]
-            candidate_fnames = [os.path.join(self.folder, a)
-                                      for a in suffix_candidate_names]
+            candidate_fnames = [os.path.join(self.folder, a) for a in suffix_candidate_names]
             all_candidates.extend(candidate_fnames)
 
             for fname in candidate_fnames:
@@ -218,8 +214,8 @@ class Performance(MSMDMetadataMixin):
         if len(candidate_files) == 0:
             if required:
                 raise MSMDDBError('No audio with requested format {0}'
-                                          ' found in performance {1}!'
-                                          ''.format(self.audio_fmt, self.folder))
+                                  ' found in performance {1}!'
+                                  ''.format(self.audio_fmt, self.folder))
             else:
                 return None
 
@@ -247,8 +243,8 @@ class Performance(MSMDMetadataMixin):
         if midi_fname is None:
             if required:
                 raise MSMDDBError('No MIDI found in performance {0}!'
-                                          ' All candidates: {1}'
-                                          ''.format(self.folder, '\n'.join(all_candidates)))
+                                  ' All candidates: {1}'
+                                  ''.format(self.folder, '\n'.join(all_candidates)))
 
         return midi_fname
 
@@ -288,11 +284,11 @@ class Performance(MSMDMetadataMixin):
 
         if not os.path.isfile(self.features[feature_name]):
             raise MSMDDBError('Performance {0}: feature {1} is'
-                                      ' available, but the file {2} does not'
-                                      ' exist...?'
-                                      ''.format(self.name,
-                                                feature_name,
-                                                self.features[feature_name]))
+                              ' available, but the file {2} does not'
+                              ' exist...?'
+                              ''.format(self.name,
+                                        feature_name,
+                                        self.features[feature_name]))
 
         feature = numpy.load(self.features[feature_name])
         return feature
@@ -323,14 +319,14 @@ class Performance(MSMDMetadataMixin):
                                    if f.endswith(suffix)]
         if len(candidate_feature_names) == 0:
             raise MSMDDBError('Performance {0}: Feature {1}'
-                                      ' not available! Availble feature'
-                                      ' names: {2}'.format(self.name, suffix,
-                                                           self.features.keys()))
+                              ' not available! Availble feature'
+                              ' names: {2}'.format(self.name, suffix,
+                                                   self.features.keys()))
         if len(candidate_feature_names) > 1:
             raise MSMDDBError('Performance {0}: More than one feature'
-                                      ' conforms to the suffix {1}: {2}'
-                                      ''.format(self.name, suffix,
-                                                candidate_feature_names))
+                              ' conforms to the suffix {1}: {2}'
+                              ''.format(self.name, suffix,
+                                        candidate_feature_names))
 
         feature_name = candidate_feature_names[0]
         return self.load_feature(feature_name)

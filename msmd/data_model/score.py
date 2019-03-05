@@ -4,16 +4,13 @@ from __future__ import print_function
 import collections
 import logging
 import os
-import pprint
 import shutil
 import time
-
 import cv2
-import yaml
+
 from muscima.graph import NotationGraph
 from muscima.inference_engine_constants import InferenceEngineConstants
 from muscima.io import parse_cropobject_list
-
 from msmd.data_model.util import MSMDDBError, path2name, MSMDMetadataMixin
 
 __version__ = "0.0.1"
@@ -47,8 +44,7 @@ class Score(MSMDMetadataMixin):
 
         if not os.path.isdir(folder):
             raise MSMDDBError('Score initialized with'
-                                      ' non-existent directory: {0}'
-                                      ''.format(folder))
+                              ' non-existent directory: {0}'.format(folder))
         self.folder = folder
         name = path2name(folder)
         self.name = name
@@ -102,10 +98,10 @@ class Score(MSMDMetadataMixin):
                                if f.endswith('.pdf')]
         if len(available_pdf_files) == 0:
             raise MSMDDBError('Instantiated a Score without the PDF'
-                                      ' authority document: {0}'.format(self.folder))
+                              ' authority document: {0}'.format(self.folder))
         if len(available_pdf_files) > 1:
             raise MSMDDBError('Instantiated a Score with more than one PDF'
-                                      ' authority document: {0}'.format(self.folder))
+                              ' authority document: {0}'.format(self.folder))
         pdf_fname = available_pdf_files[0]
         pdf_file = os.path.join(self.folder, pdf_fname)
         return pdf_file
@@ -194,8 +190,8 @@ class Score(MSMDMetadataMixin):
         self.update()
         if view_name not in self.views:
             raise MSMDDBError('Score {0}: requested view {1}'
-                                      ' not available!'
-                                      ''.format(self.name, view_name))
+                              ' not available!'
+                              ''.format(self.name, view_name))
         view_dir = self.views[view_name]
         return [os.path.join(view_dir, f) for f in sorted(os.listdir(view_dir))
                 if (not f.startswith('.')) and
@@ -206,10 +202,10 @@ class Score(MSMDMetadataMixin):
         self.update()
         if view_name not in self.views:
             raise MSMDDBError('Score {0}: requested clearing view'
-                                      ' {1}, but this view does not exist!'
-                                      ' (Available views: {2})'
-                                      ''.format(self.name, view_name,
-                                                self.views.keys()))
+                              ' {1}, but this view does not exist!'
+                              ' (Available views: {2})'
+                              ''.format(self.name, view_name,
+                                        self.views.keys()))
         shutil.rmtree(self.views[view_name])
         self.update()
 
@@ -245,7 +241,7 @@ class Score(MSMDMetadataMixin):
         self.update()
         if 'mung' not in self.views:
             raise MSMDDBError('Score {0}: mung view not available!'
-                                      ''.format(self.name))
+                              ''.format(self.name))
         mung_files = self.view_files('mung')
 
         mungos = []
@@ -274,7 +270,7 @@ class Score(MSMDMetadataMixin):
         self.update()
         if 'mung' not in self.views:
             raise MSMDDBError('Score {0}: mung view not available!'
-                                      ''.format(self.name))
+                              ''.format(self.name))
         mung_files = self.view_files('mung')
 
         # Algorithm:
@@ -318,8 +314,8 @@ class Score(MSMDMetadataMixin):
                 # Remove all tied notes.
                 if filter_tied:
                     system_notes = [m for m in system_notes
-                                     if ('tied' not in m.data)
-                                     or (('tied' in m.data) and (m.data['tied'] != 1))
+                                    if ('tied' not in m.data)
+                                    or (('tied' in m.data) and (m.data['tied'] != 1))
                                     ]
 
                 system_note_columns = group_mungos_by_column(system_notes,
@@ -339,7 +335,6 @@ class Score(MSMDMetadataMixin):
             # print('Total entries in notes_per_system = {0}'.format(len(notes_per_system)))
             notes_per_page.append(notes_per_system)
 
-
         # Data structure
         # --------------
         # notes_per_page = [
@@ -358,7 +353,7 @@ class Score(MSMDMetadataMixin):
 
         # Unroll simultaneities notes according to this data structure
 
-        ### DEBUG
+        # DEBUG
         # print('notes_per_page: {0}'.format(pprint.pformat(notes_per_page)))
 
         ordered_simultaneities = []
