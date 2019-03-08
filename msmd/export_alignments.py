@@ -1,5 +1,9 @@
 """This script takes a path to a dataset as input
 and exports the alignments from a mung-file to csv files.
+
+Example call:
+    python export_alignments.py --data /Volumes/ExtMacOS/VMs/share/msmd_rp_sf \
+    --key_ref tempo-1000_ElectricPiano --key_des cancino
 """
 import os
 import msmd
