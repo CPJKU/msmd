@@ -84,7 +84,14 @@ from midi_parser import MidiParser, notes_to_onsets, FPS
 
 # Audio augmentation settings:
 #  - fixed SF and tempo combinations for no-aug. training and evaluation,
-fixed_combinations = [(1.0, "ElectricPiano"), (1.0, "grand-piano-YDP-20160804")]
+fixed_combinations = [(1.0, "ElectricPiano"),
+                      (0.5, "grand-piano-YDP-20160804"),
+                      (0.75, "grand-piano-YDP-20160804"),
+                      (1.0, "grand-piano-YDP-20160804"),
+                      (1.25, "grand-piano-YDP-20160804"),
+                      (1.5, "grand-piano-YDP-20160804"),
+                      (1.75, "grand-piano-YDP-20160804"),
+                      (2.0, "grand-piano-YDP-20160804")]
 #  - random soundfont and tempo selection for training data augmentation
 tempo_ratios = [0.9, 0.95, 1.0, 1.05, 1.1]
 sound_fonts = ["acoustic_piano_imis_1", "ElectricPiano", "YamahaGrandPiano"]
