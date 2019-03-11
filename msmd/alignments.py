@@ -28,14 +28,14 @@ from muscima.cropobject import cropobjects_merge_bbox, CropObject, link_cropobje
 from skimage.measure import regionprops
 
 from msmd.data_model.score import group_mungos_by_column
-from msmd.midi_parser import notes_to_onsets, FPS
+from msmd.midi_parser import notes_to_onsets
 from msmd.utils import greater_than_zero_intervals
 
 __version__ = "0.0.1"
 __author__ = "Jan Hajic jr."
 
 
-def align_score_to_performance(score, performance):
+def align_score_to_performance(score, performance, fps=20):
     """For each MuNG note in the score, finds the MIDI matrix cell that
     corresponds to the onset of that note.
 
@@ -69,7 +69,7 @@ def align_score_to_performance(score, performance):
     for m_objid, e_idx in aln:
         m = mdict[m_objid]
         e = note_events[e_idx]
-        onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
+        onset_frame = notes_to_onsets([e], dt=1.0 / fps)
         m.data['{0}_onset_seconds'.format(performance.name)] = e[0]
         m.data['{0}_onset_frame'.format(performance.name)] = int(onset_frame)
 
@@ -235,7 +235,7 @@ def align_mungos_and_note_events_dtw(ordered_mungo_columns, events):
     # return aln
 
 
-def align_mungos_and_note_events_munkres(ordered_mungos, note_events, _n_debugplots=10):
+def align_mungos_and_note_events_munkres(ordered_mungos, note_events, _n_debugplots=10, fps=20):
     """Deprecated. Do not use."""
     #  - Assign to each MuNG object the MIDI note properties
     if len(note_events) != len(ordered_mungos):
@@ -300,7 +300,7 @@ def align_mungos_and_note_events_munkres(ordered_mungos, note_events, _n_debugpl
                     print('Munkres did not work on m.objid={0}/{1}, e={2:.2f}/{3}'
                           ''.format(am.objid, am.data['midi_pitch_code'], ae[0], ae[1]))
                     continue
-                onset_frame = notes_to_onsets([ae], dt=1.0 / FPS)
+                onset_frame = notes_to_onsets([ae], dt=1.0 / fps)
                 #am.data['{0}_onset_seconds'.format(performance.name)] = ae[0]
                 #am.data['{0}_onset_frame'.format(performance.name)] = int(onset_frame)
                 print('Munkres WORKED on m.objid={0}/{1}, e={2:.2f}/{3}'
@@ -330,7 +330,7 @@ def align_mungos_and_note_events_munkres(ordered_mungos, note_events, _n_debugpl
                                                        e[0],
                                                        pitch_m, pitch_e))
 
-            onset_frame = notes_to_onsets([e], dt=1.0 / FPS)
+            onset_frame = notes_to_onsets([e], dt=1.0 / fps)
             #m.data['{0}_onset_seconds'.format(performance.name)] = e[0]
             #m.data['{0}_onset_frame'.format(performance.name)] = int(onset_frame)
 

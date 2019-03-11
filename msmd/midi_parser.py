@@ -22,18 +22,15 @@ from madmom.audio.filters import LogarithmicFilterbank
 from madmom.audio.spectrogram import FilteredSpectrogramProcessor, LogarithmicSpectrogramProcessor
 from madmom.processors import SequentialProcessor
 
-# init signal processing
-SAMPLE_RATE = 22050
-FRAME_SIZE = 2048
-FPS = 20
 
-sig_proc = SignalProcessor(num_channels=1, sample_rate=SAMPLE_RATE)
-fsig_proc = FramedSignalProcessor(frame_size=FRAME_SIZE, fps=FPS, origin='future')
-spec_proc = FilteredSpectrogramProcessor(LogarithmicFilterbank, num_bands=16, fmin=30, fmax=6000)  # num_bands=24, fmin=30, fmax=8000
-log_spec_proc = LogarithmicSpectrogramProcessor()
-processor = SequentialProcessor([sig_proc, fsig_proc, spec_proc, log_spec_proc])
+def extract_spectrogram(audio_path, frame_size=2048, sample_rate=22050, fps=20):
+    sig_proc = SignalProcessor(num_channels=1, sample_rate=sample_rate)
+    fsig_proc = FramedSignalProcessor(frame_size=frame_size, fps=fps, origin='future')
+    spec_proc = FilteredSpectrogramProcessor(LogarithmicFilterbank, num_bands=16, fmin=30, fmax=6000)  # num_bands=24, fmin=30, fmax=8000
+    log_spec_proc = LogarithmicSpectrogramProcessor()
+    processor = SequentialProcessor([sig_proc, fsig_proc, spec_proc, log_spec_proc])
 
-colors = ['c', 'm', 'y']
+    return processor(audio_path).T
 
 
 def notes_to_onsets(notes, dt):
@@ -72,7 +69,7 @@ class MidiParser(object):
         """
         self.show = show
 
-    def process(self, midi_file_path, audio_path=None, return_midi_matrix=False):
+    def process(self, midi_file_path, audio_path=None, return_midi_matrix=False, fps=20):
         """
         Process midi file
         """
@@ -84,7 +81,7 @@ class MidiParser(object):
             if not os.path.isfile(audio_path):
                 logging.info('...audio file does not exist!')
 
-            Spec = processor(audio_path).T
+            Spec = extract_spectrogram(audio_path, fps=fps)
 
         # show results
         if self.show and Spec is not None:
@@ -99,9 +96,9 @@ class MidiParser(object):
 
         # Order notes by onset and top-down in simultaneities
         notes = np.asarray(sorted(m.notes, key=lambda n: (n[0], n[1] * -1)))
-        onsets = notes_to_onsets(notes, dt=1.0 / FPS)
-        durations = np.asarray([int(np.ceil(n[2] * FPS)) for n in notes])
-        midi_matrix = notes_to_matrix(notes, dt=1.0 / FPS)
+        onsets = notes_to_onsets(notes, dt=1.0 / fps)
+        durations = np.asarray([int(np.ceil(n[2] * fps)) for n in notes])
+        midi_matrix = notes_to_matrix(notes, dt=1.0 / fps)
 
         if self.show:
             plt.show(block=True)

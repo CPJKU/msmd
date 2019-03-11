@@ -76,7 +76,10 @@ from utils import sort_by_roi, natsort, get_target_shape, corners2bbox
 from pdf_parser import pdf2coords, parse_pdf
 from colormaps import cmaps
 
-from midi_parser import MidiParser, notes_to_onsets, FPS
+from midi_parser import MidiParser, notes_to_onsets
+
+
+FPS = 20
 # from omr.config.settings import DATA_ROOT as ROOT_DIR
 # from omr.utils.data import MOZART_PIECES, BACH_PIECES, HAYDN_PIECES, BEETHOVEN_PIECES, CHOPIN_PIECES, SCHUBERT_PIECES, STRAUSS_PIECES
 # PIECES = MOZART_PIECES + BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES + STRAUSS_PIECES
@@ -1299,7 +1302,8 @@ class MSMDManager(object):
             return None
 
         aln = align_score_to_performance(self.current_score,
-                                         self.current_performance)
+                                         self.current_performance,
+                                         fps=FPS)
         logging.info('Total aligned pairs: {0}'.format(len(aln)))
         self.score_performance_alignment = {
             objid: note_idx
