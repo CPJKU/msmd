@@ -244,6 +244,48 @@ class Piece(MSMDMetadataMixin):
 
         return aln
 
+    def load_pairwise_alignment(self, performance_ref, performance_des):
+        if performance_ref not in self.performances:
+            raise MSMDDBError('Piece {0} in collection {1} does'
+                              ' not have a performance with name {2}.'
+                              ' Available performances: {3}'
+                              ''.format(self.name, self.collection_root,
+                                        performance_ref,
+                                        self.available_performances))
+
+        if performance_des not in self.performances:
+            raise MSMDDBError('Piece {0} in collection {1} does'
+                              ' not have a performance with name {2}.'
+                              ' Available performances: {3}'
+                              ''.format(self.name, self.collection_root,
+                                        performance_des,
+                                        self.available_performances))
+
+        score = self.load_score(self.available_scores[0])
+        mungos = score.load_mungos()
+        aln = list()
+
+        for cur_mung in mungos:
+            onset_key_ref = performance_ref + '_onset_seconds'
+            onset_key_des = performance_des + '_onset_seconds'
+
+            # check if this note has an alignment associated to it
+            if onset_key_ref not in cur_mung.data.keys():
+                continue
+
+            if onset_key_des not in cur_mung.data.keys():
+                continue
+
+            cur_note_onset_ref = cur_mung.data[performance_ref + '_onset_seconds']
+            cur_note_onset_des = cur_mung.data[performance_des + '_onset_seconds']
+
+            aln.append((cur_note_onset_ref, cur_note_onset_des))
+
+        # sort by appearance in MIDI matrix
+        aln.sort(key=itemgetter(1))
+
+        return aln
+
     def update(self):
         """Refreshes the index of available performances
         and scores."""
