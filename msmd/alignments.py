@@ -1234,7 +1234,7 @@ def detect_system_regions_ly(image, verbose=False):
     _binarization_threshold = image.max() * 0.85
     _kernel_width_coefficient = 0.6
 
-    print('image max: {0}'.format(image.max()))
+    logging.debug('detect_system_regions_ly(): image max: {0}'.format(image.max()))
 
     image = (image <= _binarization_threshold).astype(numpy.uint8)
     kernel_size = int(image.shape[1] * _kernel_width_coefficient)
