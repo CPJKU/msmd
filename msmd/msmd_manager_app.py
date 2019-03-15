@@ -47,13 +47,15 @@ import glob
 import pickle
 import yaml
 import sys
-import warnings
-
 import numpy as np
 
 # set backend to qt
 import matplotlib
-matplotlib.use('QT4Agg')
+matplotlib.use('QT5Agg')
+import matplotlib.pyplot as plt
+from matplotlib.patches import Polygon
+from matplotlib.collections import PatchCollection
+
 from muscima.io import export_cropobject_list, parse_cropobject_list
 from msmd.alignments import group_mungos_by_system, \
     group_mungos_by_system_paths, \
@@ -65,21 +67,16 @@ from msmd.alignments import group_mungos_by_system, \
 from msmd.ly_parser import mung_midi_from_ly_links
 from msmd.data_model.piece import Piece
 from msmd.data_model.util import MSMDDBError
+from msmd.utils import sort_by_roi, natsort, get_target_shape, corners2bbox
+from msmd.pdf_parser import pdf2coords, parse_pdf
+from msmd.colormaps import cmaps
+import msmd.midi_parser as mp
+from msmd.DEFAULT_CONFIG import SAMPLE_RATE, FPS, FRAME_SIZE, SPEC_FILTERBANK_NUM_BANDS, FMIN, FMAX
 
-import matplotlib.pyplot as plt
-from matplotlib.patches import Polygon
-from matplotlib.collections import PatchCollection
 
 form_class = uic.loadUiType("gui/main.ui")[0]
 
-from utils import sort_by_roi, natsort, get_target_shape, corners2bbox
-from pdf_parser import pdf2coords, parse_pdf
-from colormaps import cmaps
 
-from midi_parser import MidiParser, notes_to_onsets
-
-
-FPS = 20
 # from omr.config.settings import DATA_ROOT as ROOT_DIR
 # from omr.utils.data import MOZART_PIECES, BACH_PIECES, HAYDN_PIECES, BEETHOVEN_PIECES, CHOPIN_PIECES, SCHUBERT_PIECES, STRAUSS_PIECES
 # PIECES = MOZART_PIECES + BACH_PIECES + HAYDN_PIECES + BEETHOVEN_PIECES + CHOPIN_PIECES + SCHUBERT_PIECES + STRAUSS_PIECES
@@ -974,9 +971,7 @@ class MSMDManager(object):
 
         if 'midi' not in self.piece.encodings:
             raise MSMDManagerError('Cannot render audio from current piece:'
-                                    ' no MIDI encoding available!')
-
-        from render_audio import render_audio
+                                   ' no MIDI encoding available!')
 
         if not performance_prefix:
             performance_prefix = self.piece.name
@@ -999,10 +994,12 @@ class MSMDManager(object):
             performance_name = performance_prefix \
                                + '_tempo-{0}'.format(int(1000 * ratio)) \
                                + '_{0}'.format(sound_font)
-            audio_file, perf_midi_file = render_audio(
-                self.piece.encodings['midi'],
-                sound_font=sound_font,
-                tempo_ratio=ratio, velocity=None)
+
+            audio_file, perf_midi_file = mp.render_audio(self.piece.encodings['midi'],
+                                                         sound_font=sound_font,
+                                                         tempo_ratio=ratio, velocity=64)
+
+            # copy all relevant files and information to piece object
             self.piece.add_performance(name=performance_name,
                                        audio_file=audio_file,
                                        midi_file=perf_midi_file,
@@ -1011,7 +1008,7 @@ class MSMDManager(object):
             self.piece.update()
             self._refresh_score_and_performance_selection()
 
-            # Cleanup!
+            # Cleanup tmp-files
             os.unlink(audio_file)
             os.unlink(perf_midi_file)
 
@@ -1051,15 +1048,14 @@ class MSMDManager(object):
         audio_file_path = performance.audio
         midi_file_path = performance.midi
         if not os.path.isfile(midi_file_path):
-            logging.warn('Performance {0} has no MIDI file, cannot'
-                         ' compute onsets and MIDI matrix. Skipping.'
-                         ''.format(performance.name))
+            logging.warning('Performance {0} has no MIDI file, cannot'
+                            ' compute onsets and MIDI matrix. Skipping.'
+                            ''.format(performance.name))
 
-        midi_parser = MidiParser(show=(self.gui and self.gui.checkBox_showSpec.isChecked()))
+        midi_parser = mp.MidiParser(show=(self.gui and self.gui.checkBox_showSpec.isChecked()))
         spectrogram, onsets, durations, midi_matrix, note_events = midi_parser.process(
-            midi_file_path,
-            audio_file_path,
-            return_midi_matrix=True)
+            midi_file_path, audio_file_path, return_midi_matrix=True,
+            frame_size=FRAME_SIZE, sample_rate=SAMPLE_RATE, fps=FPS, num_bands=SPEC_FILTERBANK_NUM_BANDS, fmin=FMIN, fmax=FMAX)
 
         performance.add_feature(spectrogram, 'spec.npy', overwrite=True)
         performance.add_feature(onsets, 'onsets.npy', overwrite=True)
@@ -1312,7 +1308,7 @@ class MSMDManager(object):
         self.load_performance_features()
 
         _perf_name = self.current_performance.name
-        print(_perf_name)
+
         for i, mungos in enumerate(self.page_mungos):
             for m in mungos:
                 if m.objid not in self.score_performance_alignment:
@@ -1693,7 +1689,6 @@ class MSMDManager(object):
             click_1 = [event.ydata, event.xdata]
 
             ax = plt.gca()
-            ax.hold(True)
 
             while len(self.drawObjects) > 0:
                 do = self.drawObjects.pop(0)
@@ -1712,7 +1707,6 @@ class MSMDManager(object):
             do = ax.plot([self.click_0[1], click_1[1]], [click_1[0], click_1[0]],
                          'r-', linewidth=2, alpha=0.5)
             self.drawObjects.append(do)
-            ax.hold(False)
 
             plt.draw()
 
@@ -1752,7 +1746,7 @@ class MSMDManager(object):
             plt.clf()
 
             # plot spectrogram
-            plt.subplot(2, 1, 1)
+            ax1 = plt.subplot(2, 1, 1)
             plt.imshow(self.spec, aspect='auto', origin='lower', cmap=cmaps['viridis'], interpolation='nearest')
 
             # If possible, retrieve a MuNG note object...
@@ -1812,7 +1806,7 @@ class MSMDManager(object):
 
             # plot midi matrix
             if self.midi_matrix is not None:
-                plt.subplot(2, 1, 2)
+                plt.subplot(2, 1, 2, sharex=ax1)
                 plt.imshow(np.max(self.midi_matrix) - self.midi_matrix, aspect='auto', cmap=plt.cm.gray,
                            interpolation='nearest', vmin=0, vmax=np.max(self.midi_matrix))
                 plt.plot([onset, onset], [0, self.midi_matrix.shape[0]], 'k-', linewidth=2.0, alpha=0.5)
@@ -2187,7 +2181,7 @@ class MSMDManager(object):
             return None, None
 
         event = self.note_events[event_idx]
-        onset = notes_to_onsets([event], 1.0 / FPS)
+        onset = mp.notes_to_onsets([event], 1.0 / FPS)
         pitch = int(event[1])
 
         return onset, pitch
@@ -2260,11 +2254,6 @@ def build_argument_parser():
 
 def launch_gui(args):
     """Launches the GUI."""
-    if args.verbose:
-        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
-    if args.debug:
-        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
-
     app = QtWidgets.QApplication(sys.argv)
     myWindow = MSMDManager(interactive=True)
     if args.data_dir:
@@ -2498,5 +2487,8 @@ def main(args):
 if __name__ == '__main__':
     parser = build_argument_parser()
     args = parser.parse_args()
-
+    if args.verbose:
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO)
+    if args.debug:
+        logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.DEBUG)
     main(args)
