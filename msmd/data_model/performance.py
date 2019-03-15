@@ -95,8 +95,8 @@ class Performance(MSMDMetadataMixin):
             with ``.npy``.
         """
         if not suffix.endswith('.npy'):
-            logging.warn('Adding a feature with an unexpected suffix: {0}'
-                         ''.format(suffix))
+            logging.warning('Adding a feature with an unexpected suffix: {0}'
+                            ''.format(suffix))
 
         if not isinstance(feature, numpy.ndarray):
             raise TypeError('Features must be numpy arrays! Got feature'
@@ -112,8 +112,8 @@ class Performance(MSMDMetadataMixin):
                 logging.info('Performance {0}: overwriting feature {1}!'
                              ''.format(self.folder, feature_name))
             else:
-                logging.warn('Performance {0}: feature {1} already exists!'
-                             ' Not added.'.format(self.folder, feature_name))
+                logging.warning('Performance {0}: feature {1} already exists!'
+                                ' Not added.'.format(self.folder, feature_name))
                 return
 
         feature_path = os.path.join(self.features_dir, feature_name)
