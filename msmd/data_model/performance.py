@@ -309,6 +309,8 @@ class Performance(MSMDMetadataMixin):
         return self._load_feature_by_suffix('_spec.npy')
 
     def load_note_events(self):
+        """Return midi notes as matrix:
+        'onset time', 'pitch', 'duration', 'velocity', 'channel'"""
         return self._load_feature_by_suffix('notes.npy')
 
     def _load_feature_by_suffix(self, suffix):
