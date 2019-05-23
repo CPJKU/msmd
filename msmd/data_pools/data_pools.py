@@ -9,7 +9,8 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 
 
-from msmd.midi_parser import notes_to_onsets, FPS
+from msmd.midi_parser import notes_to_onsets
+from msmd.DEFAULT_CONFIG import FPS
 
 from msmd.data_model.piece import Piece
 from msmd.alignments import align_score_to_performance
