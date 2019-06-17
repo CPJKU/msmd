@@ -5,7 +5,7 @@ from setuptools import setup
 
 setup(
     name='msmd',
-    version='0.1',
+    version='1.1',
     packages=['msmd',
               'msmd.gui',
               'msmd.data_model'],
