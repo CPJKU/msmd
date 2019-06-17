@@ -1,4 +1,4 @@
-
+ScoreInformedTranscriptionPool
 from __future__ import print_function
 
 import logging
@@ -937,7 +937,8 @@ def split_unwrapped_into_systems(spectrograms, midi_matrices, onset_to_coord_map
 def prepare_piece_data(collection_dir, piece_name,
                        aug_config=NO_AUGMENT,
                        require_audio=True,
-                       load_midi_matrix=False):
+                       load_midi_matrix=False,
+                       real_performance=False):
     """
     :param collection_dir:
     :param piece_name:
@@ -979,14 +980,15 @@ def prepare_piece_data(collection_dir, piece_name,
 
     for performance_key in piece.available_performances:
 
-        # check if performance matches augmentation pattern
-        tempo, synth = performance_key.split("tempo-")[1].split("_", 1)
-        tempo = float(tempo) / 1000
+        if not real_performance:
+            # check if performance matches augmentation pattern
+            tempo, synth = performance_key.split("tempo-")[1].split("_", 1)
+            tempo = float(tempo) / 1000
 
-        if synth not in aug_config["synths"]\
-                or tempo < aug_config["tempo_range"][0]\
-                or tempo > aug_config["tempo_range"][1]:
-            continue
+            if synth not in aug_config["synths"]\
+                    or tempo < aug_config["tempo_range"][0]\
+                    or tempo > aug_config["tempo_range"][1]:
+                continue
 
         # load current performance
         performance = piece.load_performance(performance_key, require_audio=require_audio)

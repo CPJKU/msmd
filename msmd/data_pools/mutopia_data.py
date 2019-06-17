@@ -12,7 +12,7 @@ from msmd.data_pools.data_pools import prepare_piece_data, prepare_piece_staff_d
 from msmd.data_pools.data_pools import AudioScoreRetrievalPool, AUGMENT, NO_AUGMENT
 from msmd.data_pools.data_pools import SPEC_CONTEXT, SHEET_CONTEXT_LEFT, SHEET_CONTEXT_RIGHT, SYSTEM_HEIGHT
 
-from data_pools import ScoreInformedTranscriptionPool
+from msmd.data_pools.data_pools import ScoreInformedTranscriptionPool
 
 
 def load_split(split_file):
