@@ -8,3 +8,4 @@ Contributors
 * Gerhard Widmer
 * Stefan Balke <https://github.com/stefan-balke>
 * Florian Henkel <https://github.com/fhenkel>
+* Luis Carvalho <https://github.com/luisfvc>
