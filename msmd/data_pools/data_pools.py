@@ -1,4 +1,3 @@
-ScoreInformedTranscriptionPool
 from __future__ import print_function
 
 import logging
@@ -1136,7 +1135,6 @@ def prepare_piece_staff_data(collection_dir, piece_name,
                staff_onset_to_coord_maps, staff_midi_matrices
     else:
         return staff_images, staff_spectrograms, staff_onset_to_coord_maps
-
 
 
 def load_audio_score_retrieval():
